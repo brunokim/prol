@@ -1,4 +1,4 @@
-from dataclasses import dataclass, astuple
+from dataclasses import dataclass, fields
 from typing import TypeVar, List, ClassVar, Any, Set
 
 
@@ -101,8 +101,8 @@ class Instruction:
     name: ClassVar[str]
 
     def __str__(self):
-        fields = ", ".join(str(field) for field in astuple(self))
-        return f"{self.name} {fields}"
+        args = ", ".join(str(getattr(self, field.name)) for field in fields(self))
+        return f"{self.name} {args}"
 
 
 @dataclass

@@ -496,11 +496,12 @@ def main():
         cc = ClauseChunks.from_clause(clause)
         print(f'  Permanent vars: {cc.perms}')
         for i, chunk in enumerate(cc.chunks):
-            print(f'  Chunk #{i}: {chunk}')
+            print(f'  Chunk #{i}: {[str(t) for t in chunk.terms]}')
             d = ChunkSets.from_chunk(chunk, cc.temps, i == 0)
             print(f'    Max args: {d.max_args}, Max regs: {d.max_regs}')
             for x in cc.temps:
-                print(f'    USE({x}) = {d.use[x]}, NOUSE({x}) = {d.no_use[x]}, CONFLICT({x}) = {d.conflict[x]}')
+                use, nouse, conflict = list(map(str, d.use[x])), list(map(str, d.no_use[x])), list(map(str, d.conflict[x]))
+                print(f'    USE({x}) = {use}, NOUSE({x}) = {nouse}, CONFLICT({x}) = {conflict}')
 
         print('Instructions:')
         compiler = ClauseCompiler(clause)
