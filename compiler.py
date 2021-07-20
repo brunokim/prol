@@ -291,7 +291,8 @@ class ChunkCompiler:
             if value is not None and isinstance(value, Var) and value != term and value in self.parent.temps:
                 self.unset_reg(reg, value)
                 addr, _ = self.temp_addr(value)
-                self.instructions.append(GetVariable(reg, addr))
+                if addr != reg:
+                    self.instructions.append(GetVariable(reg, addr))
 
         if isinstance(term, Atom):
             self.instructions.append(PutAtom(reg, term))
@@ -344,7 +345,7 @@ class ChunkCompiler:
             return self.temp_addrs[x], False
 
         use, no_use = self.use[x], self.no_use[x]
-        if is_head:
+        if not is_head:
             no_use = no_use | self.conflict[x]
 
         addr = self.alloc_reg(x, use, no_use)
@@ -388,7 +389,7 @@ testdata = [
         get_var X2, Y0
      put_struct X2, s/1
       unify_var Y1
-              = X1, X2
+              = X2, X1
         get_var X1, X3
         put_val X1, Y1
         put_var X2, Y2
@@ -419,12 +420,12 @@ testdata = [
        unify_var X0
        unify_var X1
       get_struct X0, g/1
-     unify_const a
+      unify_atom a
       get_struct X1, ./2
        unify_var X0
-     unify_const []
+      unify_atom []
       get_struct X0, h/1
-     unify_const b
+      unify_atom b
      """),
     (Clause(
         Struct('p', Var('X'), Struct('f', Var('X')), Var('Y'), Var('W')),
@@ -435,10 +436,10 @@ testdata = [
       get_struct X1, f/1
        unify_val X0
       put_struct X1, ./2
-     unify_const a
+      unify_atom a
        unify_var X4
-               = X1, X0
-               > X2, X3
+               = X0, X1
+               > X3, X2
          get_var X0, X5
          put_val X0, X4
          put_val X1, X2
@@ -449,7 +450,7 @@ testdata = [
         Struct('p', Var('X'), Var('Y'), Var('Z'), Atom('a')),
         Struct('q', Var('Z'), Var('X'), Var('Y'))),
      """
-     get_const X3, a
+      get_atom X3, a
        get_var X0, X3
        put_val X0, X2
        get_var X1, X2
@@ -460,11 +461,11 @@ testdata = [
         Struct('p', Var('X'), Atom('a'), Atom('b')),
         Struct('q', Atom('c'), Atom('d'), Struct('f', Var('X')))),
      """
-      get_const X1, a
-      get_const X2, b
+       get_atom X1, a
+       get_atom X2, b
         get_var X0, X3
-      put_const X0, c
-      put_const X1, d
+       put_atom X0, c
+       put_atom X1, d
      put_struct X2, f/1
       unify_val X3
            call q/3
@@ -476,9 +477,9 @@ testdata = [
      get_struct X2, f/1
       unify_var X2
         get_var X0, X4
-      put_const X0, a
+       put_atom X0, a
         get_var X1, X5
-      put_const X1, b
+       put_atom X1, b
      put_struct X3, g/2
       unify_val X4
       unify_val X5
@@ -499,7 +500,7 @@ def main():
     for clause, _ in testdata:
         print(f'Clause: {clause}')
         cc = ClauseChunks.from_clause(clause)
-        print(f'  Permanent vars: {cc.perms}')
+        print(f'  Permanent vars: {[str(x) for x in cc.perms]}')
         for i, chunk in enumerate(cc.chunks):
             print(f'  Chunk #{i}: {[str(t) for t in chunk.terms]}')
             d = ChunkSets.from_chunk(chunk, cc.temps, i == 0)
