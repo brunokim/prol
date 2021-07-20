@@ -1,11 +1,11 @@
-from collections import defaultdict, Counter
+from collections import defaultdict
 from model import *
-from typing import Sequence, Dict, Iterator, Tuple
+from typing import Sequence, Dict, Iterator, Tuple, Set, List, Union
 from operator import attrgetter
 
 
 try:
-    from pytest import mark
+    from pytest import mark  # type: ignore
     parametrize = mark.parametrize
 except ImportError:
     # On pdb, pytest is not available, so we stub parametrize.
@@ -30,7 +30,7 @@ class Chunk:
         xs = {}  # type: Dict[Var, None]
         for term in self.terms:
             xs.update((x, None) for x in term_vars(term))
-        return xs.keys()
+        return list(xs.keys())
 
 
 builtins: Set[Functor] = {
@@ -124,7 +124,7 @@ class ChunkSets:
 
         def calc_use(term: Struct):
             for i, arg in enumerate(term.args):
-                if arg in temps:
+                if isinstance(arg, Var) and arg in temps:
                     use[arg].add(Register(i))
 
         if is_head:
@@ -161,8 +161,8 @@ class ClauseCompiler:
         self.perms = d.perms
         self.chunks = d.chunks
 
-        self.perm_addrs: Optional[Dict[Var, Addr]] = None
-        self.temp_addrs: Optional[Dict[Var, Addr]] = None
+        self.perm_addrs: Dict[Var, StackAddr] = {}
+        self.temp_addrs: Dict[Term, Register] = {}
 
     def compile(self) -> Iterator[Instruction]:
         self.perm_addrs = {}
@@ -196,13 +196,13 @@ class ChunkCompiler:
         self.no_use = d.no_use
         self.conflict = d.conflict
 
-        self.instructions: Optional[List[Instruction]] = None
-        self.delayed_structs: Optional[List[Tuple[Struct, Register]]] = None
+        self.instructions: List[Instruction] = []
+        self.delayed_structs: List[Tuple[Struct, Register]] = []
 
-        self.free_regs: Optional[Set[Register]] = None
-        self.top_reg: Optional[int] = None
-        self.temp_addrs: Optional[Dict[Term, Register]] = None
-        self.reg_content: Optional[Dict[Register, Term]] = None
+        self.free_regs: Set[Register] = set()
+        self.top_reg = 0
+        self.temp_addrs: Dict[Term, Register] = {}
+        self.reg_content: Dict[Register, Term] = {}
 
     def set_reg(self, reg: Register, term: Term):
         self.temp_addrs[term] = reg
@@ -222,7 +222,7 @@ class ChunkCompiler:
 
         terms = self.chunk.terms
         if self.is_head:
-            head, *terms = terms
+            head, terms = terms[0], terms[1:]
             for i in range(head.arity):
                 self.free_regs.remove(Register(i))
             self.compile_head(head)
@@ -284,10 +284,11 @@ class ChunkCompiler:
             self.instructions.append(UnifyVariable(addr))
 
     def put_term(self, term: Term, reg: Register, *, top_level:bool=False):
+        addr: Addr
         # Move content out of register if in conflict.
         if top_level:
             value = self.reg_content.get(reg)
-            if value is not None and value != term and value in self.parent.temps:
+            if value is not None and isinstance(value, Var) and value != term and value in self.parent.temps:
                 self.unset_reg(reg, value)
                 addr, _ = self.temp_addr(value)
                 self.instructions.append(GetVariable(reg, addr))
@@ -310,7 +311,7 @@ class ChunkCompiler:
                 if isinstance(arg, Var):
                     delayed_vars.append(arg)
                 elif isinstance(arg, Struct):
-                    addr = self.term_addr(arg)
+                    addr = self.struct_addr(arg)
                     self.instructions.append(UnifyValue(addr))
                 else:
                     self.unify_arg(arg)
@@ -324,17 +325,21 @@ class ChunkCompiler:
             addr, _ = self.var_addr(term)
             return addr
         if isinstance(term, Struct):
-            addr, is_new = self.temp_addr(term)
-            if is_new:
-                self.put_term(term, addr)
-            return addr
+            return self.struct_addr(term)
+        raise NotImplementedError(f"term_addr: unhandled term type {type(term)}")
+
+    def struct_addr(self, struct: Struct) -> Register:
+        addr, is_new = self.temp_addr(struct)
+        if is_new:
+            self.put_term(struct, addr)
+        return addr
 
     def var_addr(self, x: Var, *, is_head:bool=False) -> Tuple[Addr, bool]:
         if x in self.parent.perms:
             return self.parent.perm_addr(x)
         return self.temp_addr(x, is_head=is_head)
 
-    def temp_addr(self, x: Var, *, is_head:bool=False) -> Tuple[Addr, bool]:
+    def temp_addr(self, x: Union[Var, Struct], *, is_head:bool=False) -> Tuple[Register, bool]:
         if x in self.temp_addrs:
             return self.temp_addrs[x], False
 

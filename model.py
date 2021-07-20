@@ -1,12 +1,16 @@
 from dataclasses import dataclass, fields
-from typing import TypeVar, List, ClassVar, Any, Set
+from typing import List, ClassVar, Any
 
 
 def is_var_name(name: str) -> bool:
     return bool(name) and (name[0].isupper() or name[0] == '_')
 
 
-class Var:
+class Term:
+    pass
+
+
+class Var(Term):
     def __init__(self, name: str):
         if not is_var_name(name):
             raise ValueError(f"Invalid var name: {name}")
@@ -16,7 +20,7 @@ class Var:
         return self.name
 
 
-class Atom:
+class Atom(Term):
     def __init__(self, name: str):
         if is_var_name(name):
             raise ValueError(f"Invalid atom name: {name}")
@@ -35,7 +39,7 @@ class Functor:
         return f"{self.name}/{self.arity}"
 
 
-class Struct:
+class Struct(Term):
     def __init__(self, name: str, *args: "Term"):
         if is_var_name(name):
             raise ValueError(f"Invalid struct name: {name}")
@@ -54,9 +58,6 @@ class Struct:
         return f"{self.name}({args})"
 
 
-Term = TypeVar("Term", Var, Atom, Struct)
-
-
 class Clause:
     def __init__(self, head: Struct, *body: Struct):
         self.head = head
@@ -69,8 +70,12 @@ class Clause:
         return f"{self.head} :-\n  {body}."
 
 
+class Addr:
+    pass
+
+
 @dataclass(frozen=True)
-class Register:
+class Register(Addr):
     index: int
 
     def __str__(self):
@@ -78,7 +83,7 @@ class Register:
 
 
 @dataclass(frozen=True)
-class StackAddr:
+class StackAddr(Addr):
     index: int
 
     def __str__(self):
@@ -86,14 +91,11 @@ class StackAddr:
 
 
 @dataclass(frozen=True)
-class AtomAddr:
+class AtomAddr(Addr):
     atom: Atom
 
     def __str__(self):
         return f"@{self.atom}"
-
-
-Addr = TypeVar("Addr", Register, StackAddr, AtomAddr)
 
 
 @dataclass
