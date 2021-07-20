@@ -19,6 +19,12 @@ class Var(Term):
     def __str__(self):
         return self.name
 
+    def __hash__(self):
+        return hash(self.name)
+
+    def __eq__(self, other):
+        return isinstance(other, Var) and self.name == other.name
+
 
 class Atom(Term):
     def __init__(self, name: str):
@@ -28,6 +34,12 @@ class Atom(Term):
 
     def __str__(self):
         return self.name
+
+    def __hash__(self):
+        return hash(self.name)
+
+    def __eq__(self, other):
+        return isinstance(other, Atom) and self.name == other.name
 
 
 @dataclass(frozen=True)
@@ -57,6 +69,13 @@ class Struct(Term):
         args = ", ".join(str(arg) for arg in self.args)
         return f"{self.name}({args})"
 
+    def __hash__(self):
+        return hash((self.name, self.args))
+
+    def __eq__(self, other):
+        return isinstance(other, Struct) and self.name == other.name and self.args == other.args
+
+
 
 class Clause:
     def __init__(self, head: Struct, *body: Struct):
@@ -68,6 +87,9 @@ class Clause:
             return f"{self.head}."
         body = ",\n  ".join(str(s) for s in self.body)
         return f"{self.head} :-\n  {body}."
+
+    def __repr__(self):
+        return str(self)
 
 
 class Addr:
