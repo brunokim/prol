@@ -417,6 +417,7 @@ class ChunkCompiler:
 
         use, no_use = self.use[x], self.no_use[x]
         if not is_head:
+            # Conflict avoidance: do not use registers that are necessary for last goal args.
             no_use = no_use | self.conflict[x]
 
         addr = self.alloc_reg(x, use, no_use)
