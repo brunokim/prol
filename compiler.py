@@ -261,7 +261,12 @@ class ChunkCompiler:
         # in builtins before the last goal.
         for goal in terms[:-1]:
             name = goal.name
-            addrs = [self.term_addr(arg) for arg in goal.args]
+            addrs = []
+            for arg in goal.args:
+                addr, is_new = self.term_addr(arg)
+                if is_new and isinstance(arg, Struct):
+                    self.put_term(arg, addr)
+                addrs.append(addr)
             self.instructions.append(Builtin([name, *addrs]))
 
         # If clause is not a fact, there's a last goal that requires issuing put instructions and
@@ -356,32 +361,24 @@ class ChunkCompiler:
                 if isinstance(arg, Var):
                     delayed_vars.append(arg)
                 elif isinstance(arg, Struct):
-                    addr = self.struct_addr(arg)
+                    addr, is_new = self.temp_addr(arg)
+                    if is_new:
+                        self.put_term(arg, addr)
                     self.instructions.append(UnifyValue(addr))
                 else:
                     self.unify_arg(arg)
             for x in delayed_vars:
                 self.unify_arg(x)
 
-    def term_addr(self, term: Term) -> Addr:
+    def term_addr(self, term: Term) -> Tuple[Addr, bool]:
         """Return address for a term."""
         if isinstance(term, Atom):
-            return AtomAddr(term)
+            return AtomAddr(term), False
         if isinstance(term, Var):
-            addr, _ = self.var_addr(term)
-            return addr
+            return self.var_addr(term)
         if isinstance(term, Struct):
-            return self.struct_addr(term)
+            return self.temp_addr(term)
         raise NotImplementedError(f"term_addr: unhandled term type {type(term)}")
-
-    def struct_addr(self, struct: Struct) -> Register:
-        """Return address for a struct.
-
-        If struct isn't present yet in a register, issue put instructions."""
-        addr, is_new = self.temp_addr(struct)
-        if is_new:
-            self.put_term(struct, addr)
-        return addr
 
     def var_addr(self, x: Var, *, is_head: bool = False) -> Tuple[Addr, bool]:
         """Return address for a variable."""
