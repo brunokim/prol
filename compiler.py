@@ -554,15 +554,19 @@ testdata = [
     (Clause(Struct('f-eq', Var('X'), Var('Y')),
         Struct('f', Var('X'), Var('A')),
         Struct('f', Var('Y'), Var('B')),
+        Struct(r'\==', Var('B'), Struct('p', Atom('a'))),
         Struct('=', Var('A'), Var('B'))),
-     """
-     get_var X1, Y0
-     put_var X1, Y1
-        call f/2
-     put_val X0, Y0
-     put_var X1, Y2
-        call f/2
-           = Y1, Y2
+     r"""
+        get_var X1, Y0
+        put_var X1, Y1
+           call f/2
+        put_val X0, Y0
+        put_var X1, Y2
+           call f/2
+     put_struct X0, p/1
+     unify_atom a
+            \== Y2, X0
+              = Y1, Y2
      """),
 ]
 
