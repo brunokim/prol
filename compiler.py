@@ -127,7 +127,6 @@ def count_nested_structs(chunk: Chunk) -> int:
 @dataclass
 class ChunkSets:
     """Analysis of temporary variables' locations to compute best registers to allocate."""
-    max_args: int
     max_regs: int
     use: Dict[Var, Set[Register]]
     no_use: Dict[Var, Set[Register]]
@@ -176,7 +175,7 @@ class ChunkSets:
                 if arg != x:
                     conflict[x].add(Register(i))
 
-        return ChunkSets(max_args, max_regs, use, no_use, conflict)
+        return ChunkSets(max_regs, use, no_use, conflict)
 
 
 class ClauseCompiler:
@@ -221,7 +220,6 @@ class ChunkCompiler:
         self.parent = clause_compiler
 
         d = ChunkSets.from_chunk(chunk, clause_compiler.temps, is_head)
-        self.max_args = d.max_args
         self.max_regs = d.max_regs
         self.use = d.use
         self.no_use = d.no_use
@@ -231,7 +229,6 @@ class ChunkCompiler:
         self.delayed_structs: List[Tuple[Struct, Register]] = []
 
         self.free_regs: Set[Register] = set()
-        self.top_reg = 0
         self.temp_addrs: Dict[Term, Register] = {}
         self.reg_content: Dict[Register, Term] = {}
 
@@ -246,7 +243,6 @@ class ChunkCompiler:
     def compile(self) -> Iterator[Instruction]:
         self.instructions = []
         self.free_regs = {Register(i) for i in range(self.max_regs)}
-        self.top_reg = self.max_args
 
         self.temp_addrs = {}
         self.reg_content = {}
@@ -416,14 +412,8 @@ class ChunkCompiler:
         free = self.free_regs & use
         if not free:
             free = self.free_regs - no_use
-        if free:
-            reg = min(free, key=attrgetter('index'))
-            self.free_regs.remove(reg)
-            return reg
-
-        # Create a new register.
-        reg = Register(self.top_reg)
-        self.top_reg += 1
+        reg = min(free, key=attrgetter('index'))
+        self.free_regs.remove(reg)
         return reg
 
 
@@ -563,7 +553,7 @@ def main():
         for i, chunk in enumerate(cc.chunks):
             print(f'  Chunk #{i}: {[str(t) for t in chunk.terms]}')
             d = ChunkSets.from_chunk(chunk, cc.temps, i == 0)
-            print(f'    Max args: {d.max_args}, Max regs: {d.max_regs}')
+            print(f'    Max regs: {d.max_regs}')
             for x in cc.temps:
                 use = list(map(str, d.use[x]))
                 nouse = list(map(str, d.no_use[x]))
