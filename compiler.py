@@ -1,3 +1,11 @@
+"""Compiler for Warren Abstract Machine.
+
+We don't implement all WAM instructions, specially those related to unsafe/local divide of memory.
+All memory cells are Python objects, so we don't need to worry about a stack cell pointing to a heap
+cell.
+
+We use Debray's algorithm to allocate registers [1]."""
+
 from collections import defaultdict
 from model import *
 from typing import Sequence, Dict, Iterator, Tuple, Set, List, Union
@@ -15,6 +23,7 @@ except ImportError:
 
 
 def term_vars(term: Term) -> Iterator[Var]:
+    """Yield all vars within term, in depth-first order and with repetition."""
     if isinstance(term, Var):
         yield term
     if isinstance(term, Struct):
@@ -23,16 +32,20 @@ def term_vars(term: Term) -> Iterator[Var]:
 
 
 class Chunk:
+    """Section of clause containing builtin predicates followed by a non-builtin."""
+
     def __init__(self, *terms: Struct):
         self.terms = terms
 
     def vars(self) -> Sequence[Var]:
+        """Returns all vars within chunk in depth-first order, without repetition."""
         xs = {}  # type: Dict[Var, None]
         for term in self.terms:
             xs.update((x, None) for x in term_vars(term))
         return list(xs.keys())
 
 
+# Functors of builtin predicates.
 builtins: Set[Functor] = {
     Functor("!", 0),
     Functor("=", 2),
@@ -46,6 +59,7 @@ builtins: Set[Functor] = {
 
 
 def gen_chunks(clause: Clause) -> Iterator[Chunk]:
+    """Yield chunks from clause."""
     terms = [clause.head]
     for term in clause.body:
         terms.append(term)
@@ -54,11 +68,12 @@ def gen_chunks(clause: Clause) -> Iterator[Chunk]:
         yield Chunk(*terms)
         terms = []
     if terms:
-        yield Chunk(*terms) 
+        yield Chunk(*terms)
 
 
 @dataclass
 class ClauseChunks:
+    """List of chunks from clause, and associated variable classification between permanent and temporary."""
     temps: List[Var]
     perms: List[Var]
     chunks: List[Chunk]
@@ -83,6 +98,17 @@ class ClauseChunks:
 
 
 def count_nested_structs(chunk: Chunk) -> int:
+    """Count structs in chunk goals.
+
+    E.g., the chunk [f(s(X), p(q(a)))] has 3 nested structs: s(X), p(...) and q(a).
+
+    >>> count_nested_structs(Chunk(
+    ...     Struct("f",
+    ...         Struct("s", Var("X")),
+    ...         Struct("p", Struct("q", Atom("a"))))))
+    ...
+    3
+    """
     n = 0
 
     def count_structs(term: Term):
@@ -100,12 +126,13 @@ def count_nested_structs(chunk: Chunk) -> int:
 
 @dataclass
 class ChunkSets:
+    """Analysis of temporary variables' locations to compute best registers to allocate."""
     max_args: int
     max_regs: int
     use: Dict[Var, Set[Register]]
     no_use: Dict[Var, Set[Register]]
     conflict: Dict[Var, Set[Register]]
-    
+
     @classmethod
     def from_chunk(cls, chunk: Chunk, temps: List[Var], is_head: bool):
         first_term = chunk.terms[0]
@@ -153,6 +180,8 @@ class ChunkSets:
 
 
 class ClauseCompiler:
+    """Compiler for a single predicate clause."""
+
     def __init__(self, clause: Clause):
         self.clause = clause
 
@@ -184,6 +213,8 @@ class ClauseCompiler:
 
 
 class ChunkCompiler:
+    """Compiler for a clause chunk."""
+
     def __init__(self, chunk: Chunk, is_head: bool, clause_compiler: ClauseCompiler):
         self.chunk = chunk
         self.is_head = is_head
@@ -221,12 +252,15 @@ class ChunkCompiler:
         self.reg_content = {}
 
         terms = self.chunk.terms
+
+        # If this is the clause head, compile first chunk to issue get instructions.
         if self.is_head:
             head, terms = terms[0], terms[1:]
             for i in range(head.arity):
                 self.free_regs.remove(Register(i))
             self.compile_head(head)
 
+        # Compile intermediate, builtin goals.
         # TODO: free registers from temp variables that are last referenced
         # in builtins before the last goal.
         for goal in terms[:-1]:
@@ -234,6 +268,9 @@ class ChunkCompiler:
             addrs = [self.term_addr(arg) for arg in goal.args]
             self.instructions.append(Builtin([name, *addrs]))
 
+        # If clause is not a fact, there's a last goal that requires issuing put instructions and
+        # predicate call.
+        # TODO: what if last chunk of clause is made with predicates?
         if terms:
             last_goal = terms[-1]
             for i, arg in enumerate(last_goal.args):
@@ -243,6 +280,10 @@ class ChunkCompiler:
         yield from self.instructions
 
     def compile_head(self, head: Struct):
+        """Compile head of clause.
+
+        Yield get instructions for args, delaying structs after atoms and vars.
+        If there is a nested struct, it will be added to the delayed list as well."""
         self.delayed_structs = []
         for i, arg in enumerate(head.args):
             self.get_term(arg, Register(i))
@@ -253,6 +294,7 @@ class ChunkCompiler:
                 self.get_term(struct, addr)
 
     def get_term(self, term: Term, reg: Register):
+        """Issue get instruction for term."""
         if isinstance(term, Atom):
             self.instructions.append(GetAtom(reg, term))
             self.free_regs.add(reg)
@@ -272,6 +314,7 @@ class ChunkCompiler:
                 self.unify_arg(arg)
 
     def unify_arg(self, term: Term):
+        """Issue unify instruction for struct arg."""
         if isinstance(term, Atom):
             self.instructions.append(UnifyAtom(term))
         elif isinstance(term, Var):
@@ -283,9 +326,14 @@ class ChunkCompiler:
             self.delayed_structs.append((term, addr))
             self.instructions.append(UnifyVariable(addr))
 
-    def put_term(self, term: Term, reg: Register, *, top_level:bool=False):
+    def put_term(self, term: Term, reg: Register, *, top_level: bool = False):
+        """Issue put instruction for term in register.
+
+        Debray's allocation method lets variables as long as possible in the register.
+        If we were to put a term in the same register, we need to move it first
+        elsewhere."""
         addr: Addr
-        # Move content out of register if in conflict.
+        # Conflict resolution: move content out of register if in conflict.
         if top_level:
             value = self.reg_content.get(reg)
             if value is not None and isinstance(value, Var) and value != term and value in self.parent.temps:
@@ -320,6 +368,7 @@ class ChunkCompiler:
                 self.unify_arg(x)
 
     def term_addr(self, term: Term) -> Addr:
+        """Return address for a term."""
         if isinstance(term, Atom):
             return AtomAddr(term)
         if isinstance(term, Var):
@@ -330,17 +379,26 @@ class ChunkCompiler:
         raise NotImplementedError(f"term_addr: unhandled term type {type(term)}")
 
     def struct_addr(self, struct: Struct) -> Register:
+        """Return address for a struct.
+
+        If struct isn't present yet in a register, issue put instructions."""
         addr, is_new = self.temp_addr(struct)
         if is_new:
             self.put_term(struct, addr)
         return addr
 
-    def var_addr(self, x: Var, *, is_head:bool=False) -> Tuple[Addr, bool]:
+    def var_addr(self, x: Var, *, is_head: bool = False) -> Tuple[Addr, bool]:
+        """Return address for a variable."""
         if x in self.parent.perms:
             return self.parent.perm_addr(x)
         return self.temp_addr(x, is_head=is_head)
 
-    def temp_addr(self, x: Union[Var, Struct], *, is_head:bool=False) -> Tuple[Register, bool]:
+    def temp_addr(self, x: Union[Var, Struct], *, is_head: bool = False) -> Tuple[Register, bool]:
+        """Return register for a variable or struct.
+
+        Debray's allocation algorithm seeks to put address in registers used by the variable
+        (either in first or last goals of chunk), and avoid registers used by other variables (NOUSE set)
+        or any term in the last goal (CONFLICT set)."""
         if x in self.temp_addrs:
             return self.temp_addrs[x], False
 
@@ -353,6 +411,7 @@ class ChunkCompiler:
         return addr, True
 
     def alloc_reg(self, x, use, no_use):
+        """Allocate a register for a variable or struct."""
         # Try to allocate a free register.
         free = self.free_regs & use
         if not free:
@@ -370,7 +429,7 @@ class ChunkCompiler:
 
 testdata = [
     (Clause(
-        Struct('member', Var('E'), Struct('.', Var('H'), Var('T'))), 
+        Struct('member', Var('E'), Struct('.', Var('H'), Var('T'))),
         Struct('member_', Var('T'), Var('E'), Var('H'))),
      """
       get_struct X1, ./2
@@ -410,11 +469,11 @@ testdata = [
            call is_even/1
      """),
     (Clause(Struct('f',
-        Struct('.',
-            Struct('g', Atom('a')),
-            Struct('.',
-                Struct('h', Atom('b')),
-                Atom('[]'))))),
+                   Struct('.',
+                          Struct('g', Atom('a')),
+                          Struct('.',
+                                 Struct('h', Atom('b')),
+                                 Atom('[]'))))),
      """
       get_struct X0, ./2
        unify_var X0
@@ -506,7 +565,9 @@ def main():
             d = ChunkSets.from_chunk(chunk, cc.temps, i == 0)
             print(f'    Max args: {d.max_args}, Max regs: {d.max_regs}')
             for x in cc.temps:
-                use, nouse, conflict = list(map(str, d.use[x])), list(map(str, d.no_use[x])), list(map(str, d.conflict[x]))
+                use = list(map(str, d.use[x]))
+                nouse = list(map(str, d.no_use[x]))
+                conflict = list(map(str, d.conflict[x]))
                 print(f'    USE({x}) = {use}, NOUSE({x}) = {nouse}, CONFLICT({x}) = {conflict}')
 
         print('Instructions:')

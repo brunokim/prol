@@ -76,7 +76,6 @@ class Struct(Term):
         return isinstance(other, Struct) and self.name == other.name and self.args == other.args
 
 
-
 class Clause:
     def __init__(self, head: Struct, *body: Struct):
         self.head = head
