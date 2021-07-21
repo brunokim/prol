@@ -277,7 +277,7 @@ class ChunkCompiler:
 
         # If clause is not a fact, there's a last goal that requires issuing put instructions and
         # predicate call.
-        # TODO: what if last chunk of clause is made with predicates?
+        # TODO: what if last chunk of clause contains only builtin predicates?
         if terms:
             last_goal = terms[-1]
             for i, arg in enumerate(last_goal.args):
@@ -317,6 +317,8 @@ class ChunkCompiler:
             self.free_regs.add(reg)
             for arg in term.args:
                 yield from self.unify_arg(arg)
+        else:
+            raise NotImplementedError(f"get_term: unhandled term type {type(term)}")
 
     def unify_arg(self, term: Term) -> Iterator[Instruction]:
         """Issue unify instruction for struct arg."""
@@ -330,6 +332,8 @@ class ChunkCompiler:
             addr, _ = self.temp_addr(term)
             self.delayed_structs.append((term, addr))
             yield UnifyVariable(addr)
+        else:
+            raise NotImplementedError(f"unify_arg: unhandled term type {type(term)}")
 
     def put_term(self, term: Term, reg: Register, *, top_level: bool = False) -> Iterator[Instruction]:
         """Issue put instruction for term in register.
@@ -373,6 +377,8 @@ class ChunkCompiler:
                     yield from self.unify_arg(arg)
             for x in delayed_vars:
                 yield from self.unify_arg(x)
+        else:
+            raise NotImplementedError(f"put_term: unhandled term type {type(term)}")
 
     def term_addr(self, term: Term) -> Tuple[Addr, AddrAlloc]:
         """Return address for a term."""
