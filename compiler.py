@@ -363,11 +363,13 @@ class ChunkCompiler:
             yield PutAtom(reg, term)
         elif isinstance(term, Var):
             addr, alloc_addr = self.var_addr(term)
-            if alloc_addr == AddrAlloc.EXISTING and addr == reg:
-                # Filter no-op PutValue instruction that wouldn't move value around.
-                return
-            instr = PutValue(reg, addr) if alloc_addr == AddrAlloc.EXISTING else PutVariable(reg, addr)
-            yield instr
+            if alloc_addr == AddrAlloc.EXISTING:
+                if addr == reg:
+                    # Filter no-op PutValue instruction that wouldn't move value around.
+                    return
+                yield PutValue(reg, addr)
+            else:
+                yield PutVariable(reg, addr)
             if isinstance(addr, Register):
                 self.free_regs.add(addr)
         elif isinstance(term, Struct):
