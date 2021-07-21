@@ -262,10 +262,21 @@ class ChunkCompiler:
                 self.free_regs.remove(Register(i))
             yield from self.compile_head(head)
 
+        # Early return if clause is a fact.
+        if not terms:
+            return
+
+        last_goal = terms[-1]
+        if last_goal.functor() in builtins:
+            builtin_goals = terms
+            last_goal = None
+        else:
+            builtin_goals = terms[:-1]
+
         # Compile intermediate, builtin goals.
         # TODO: free registers from temp variables that are last referenced
         # in builtins before the last goal.
-        for goal in terms[:-1]:
+        for goal in builtin_goals:
             name = goal.name
             addrs = []
             for arg in goal.args:
@@ -275,11 +286,8 @@ class ChunkCompiler:
                 addrs.append(addr)
             yield Builtin([name, *addrs])
 
-        # If clause is not a fact, there's a last goal that requires issuing put instructions and
-        # predicate call.
-        # TODO: what if last chunk of clause contains only builtin predicates?
-        if terms:
-            last_goal = terms[-1]
+        # Issue put instructions and predicate call for non-builtin goal.
+        if last_goal is not None:
             for i, arg in enumerate(last_goal.args):
                 yield from self.put_term(arg, Register(i), top_level=True)
             yield Call(last_goal.functor())
@@ -542,6 +550,19 @@ testdata = [
       unify_val X4
       unify_val X5
            call q/4
+     """),
+    (Clause(Struct('f-eq', Var('X'), Var('Y')),
+        Struct('f', Var('X'), Var('A')),
+        Struct('f', Var('Y'), Var('B')),
+        Struct('=', Var('A'), Var('B'))),
+     """
+     get_var X1, Y0
+     put_var X1, Y1
+        call f/2
+     put_val X0, Y0
+     put_var X1, Y2
+        call f/2
+           = Y1, Y2
      """),
 ]
 
