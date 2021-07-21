@@ -8,7 +8,7 @@ We use Debray's algorithm to allocate registers [1]."""
 
 from collections import defaultdict
 from model import *
-from typing import Sequence, Dict, Iterator, Tuple, Set, List, Union
+from typing import cast, Sequence, Dict, Iterator, Tuple, Set, List, Union
 from operator import attrgetter
 
 
@@ -225,7 +225,6 @@ class ChunkCompiler:
         self.no_use = d.no_use
         self.conflict = d.conflict
 
-        self.instructions: List[Instruction] = []
         self.delayed_structs: List[Tuple[Struct, Register]] = []
 
         self.free_regs: Set[Register] = set()
@@ -241,7 +240,6 @@ class ChunkCompiler:
         del self.reg_content[reg]
 
     def compile(self) -> Iterator[Instruction]:
-        self.instructions = []
         self.free_regs = {Register(i) for i in range(self.max_regs)}
 
         self.temp_addrs = {}
@@ -254,7 +252,7 @@ class ChunkCompiler:
             head, terms = terms[0], terms[1:]
             for i in range(head.arity):
                 self.free_regs.remove(Register(i))
-            self.compile_head(head)
+            yield from self.compile_head(head)
 
         # Compile intermediate, builtin goals.
         # TODO: free registers from temp variables that are last referenced
@@ -265,9 +263,9 @@ class ChunkCompiler:
             for arg in goal.args:
                 addr, is_new = self.term_addr(arg)
                 if is_new and isinstance(arg, Struct):
-                    self.put_term(arg, addr)
+                    yield from self.put_term(arg, cast(Register, addr))
                 addrs.append(addr)
-            self.instructions.append(Builtin([name, *addrs]))
+            yield Builtin([name, *addrs])
 
         # If clause is not a fact, there's a last goal that requires issuing put instructions and
         # predicate call.
@@ -275,29 +273,27 @@ class ChunkCompiler:
         if terms:
             last_goal = terms[-1]
             for i, arg in enumerate(last_goal.args):
-                self.put_term(arg, Register(i), top_level=True)
-            self.instructions.append(Call(last_goal.functor()))
+                yield from self.put_term(arg, Register(i), top_level=True)
+            yield Call(last_goal.functor())
 
-        yield from self.instructions
-
-    def compile_head(self, head: Struct):
+    def compile_head(self, head: Struct) -> Iterator[Instruction]:
         """Compile head of clause.
 
         Yield get instructions for args, delaying structs after atoms and vars.
         If there is a nested struct, it will be added to the delayed list as well."""
         self.delayed_structs = []
         for i, arg in enumerate(head.args):
-            self.get_term(arg, Register(i))
+            yield from self.get_term(arg, Register(i))
         while self.delayed_structs:
             delayed = self.delayed_structs.copy()
             self.delayed_structs = []
             for struct, addr in delayed:
-                self.get_term(struct, addr)
+                yield from self.get_term(struct, addr)
 
-    def get_term(self, term: Term, reg: Register):
+    def get_term(self, term: Term, reg: Register) -> Iterator[Instruction]:
         """Issue get instruction for term."""
         if isinstance(term, Atom):
-            self.instructions.append(GetAtom(reg, term))
+            yield GetAtom(reg, term)
             self.free_regs.add(reg)
         elif isinstance(term, Var):
             self.set_reg(reg, term)
@@ -306,28 +302,28 @@ class ChunkCompiler:
                 # Filter no-op Get instructions that wouldn't move values around.
                 return
             instr = GetVariable(reg, addr) if is_new else GetValue(reg, addr)
-            self.instructions.append(instr)
+            yield instr
             self.free_regs.add(reg)
         elif isinstance(term, Struct):
-            self.instructions.append(GetStruct(reg, term.functor()))
+            yield GetStruct(reg, term.functor())
             self.free_regs.add(reg)
             for arg in term.args:
-                self.unify_arg(arg)
+                yield from self.unify_arg(arg)
 
-    def unify_arg(self, term: Term):
+    def unify_arg(self, term: Term) -> Iterator[Instruction]:
         """Issue unify instruction for struct arg."""
         if isinstance(term, Atom):
-            self.instructions.append(UnifyAtom(term))
+            yield UnifyAtom(term)
         elif isinstance(term, Var):
             addr, is_new = self.var_addr(term)
             instr = UnifyVariable(addr) if is_new else UnifyValue(addr)
-            self.instructions.append(instr)
+            yield instr
         elif isinstance(term, Struct):
             addr, _ = self.temp_addr(term)
             self.delayed_structs.append((term, addr))
-            self.instructions.append(UnifyVariable(addr))
+            yield UnifyVariable(addr)
 
-    def put_term(self, term: Term, reg: Register, *, top_level: bool = False):
+    def put_term(self, term: Term, reg: Register, *, top_level: bool = False) -> Iterator[Instruction]:
         """Issue put instruction for term in register.
 
         Debray's allocation method lets variables as long as possible in the register.
@@ -341,21 +337,21 @@ class ChunkCompiler:
                 self.unset_reg(reg, value)
                 addr, _ = self.temp_addr(value)
                 if addr != reg:
-                    self.instructions.append(GetVariable(reg, addr))
+                    yield GetVariable(reg, addr)
 
         if isinstance(term, Atom):
-            self.instructions.append(PutAtom(reg, term))
+            yield PutAtom(reg, term)
         elif isinstance(term, Var):
             addr, is_new = self.var_addr(term)
             if not is_new and addr == reg:
                 # Filter no-op PutValue instruction that wouldn't move value around.
                 return
             instr = PutVariable(reg, addr) if is_new else PutValue(reg, addr)
-            self.instructions.append(instr)
+            yield instr
             if isinstance(addr, Register):
                 self.free_regs.add(addr)
         elif isinstance(term, Struct):
-            self.instructions.append(PutStruct(reg, term.functor()))
+            yield PutStruct(reg, term.functor())
             delayed_vars = []  # type: List[Var]
             for arg in term.args:
                 if isinstance(arg, Var):
@@ -364,11 +360,11 @@ class ChunkCompiler:
                     addr, is_new = self.temp_addr(arg)
                     if is_new:
                         self.put_term(arg, addr)
-                    self.instructions.append(UnifyValue(addr))
+                    yield UnifyValue(addr)
                 else:
-                    self.unify_arg(arg)
+                    yield from self.unify_arg(arg)
             for x in delayed_vars:
-                self.unify_arg(x)
+                yield from self.unify_arg(x)
 
     def term_addr(self, term: Term) -> Tuple[Addr, bool]:
         """Return address for a term."""
