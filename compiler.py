@@ -406,7 +406,7 @@ class ChunkCompiler:
         self.set_reg(addr, x)
         return addr, True
 
-    def alloc_reg(self, x, use, no_use):
+    def alloc_reg(self, x: Union[Var, Struct], use: Set[Register], no_use: Set[Register]) -> Register:
         """Allocate a register for a variable or struct."""
         # Try to allocate a free register.
         free = self.free_regs & use
