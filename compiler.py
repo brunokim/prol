@@ -7,6 +7,7 @@ cell.
 We use Debray's algorithm to allocate registers [1]."""
 
 from collections import defaultdict
+from enum import Enum, auto
 from model import *
 from typing import cast, Sequence, Dict, Iterator, Tuple, Set, List, Union
 from operator import attrgetter
@@ -178,6 +179,13 @@ class ChunkSets:
         return ChunkSets(max_regs, use, no_use, conflict)
 
 
+class AddrAlloc(Enum):
+    """Address allocation result."""
+    EXISTING = auto()
+    NEW_VAR = auto()
+    NEW_STRUCT = auto()
+
+
 class ClauseCompiler:
     """Compiler for a single predicate clause."""
 
@@ -200,15 +208,15 @@ class ClauseCompiler:
             yield from chunk_compiler.compile()
             self.temp_addrs.update(chunk_compiler.temp_addrs)
 
-    def perm_addr(self, x: Var) -> Tuple[StackAddr, bool]:
+    def perm_addr(self, x: Var) -> Tuple[StackAddr, AddrAlloc]:
         if x not in self.perms:
             raise ValueError(f"{x} is not a permanent variable: {self.perms}")
         if x in self.perm_addrs:
-            return self.perm_addrs[x], False
+            return self.perm_addrs[x], AddrAlloc.EXISTING
         index = len(self.perm_addrs)
         addr = StackAddr(index)
         self.perm_addrs[x] = addr
-        return addr, True
+        return addr, AddrAlloc.NEW_VAR
 
 
 class ChunkCompiler:
@@ -261,8 +269,8 @@ class ChunkCompiler:
             name = goal.name
             addrs = []
             for arg in goal.args:
-                addr, is_new = self.term_addr(arg)
-                if is_new and isinstance(arg, Struct):
+                addr, alloc_addr = self.term_addr(arg)
+                if alloc_addr == AddrAlloc.NEW_STRUCT:
                     yield from self.put_term(arg, cast(Register, addr))
                 addrs.append(addr)
             yield Builtin([name, *addrs])
@@ -297,11 +305,11 @@ class ChunkCompiler:
             self.free_regs.add(reg)
         elif isinstance(term, Var):
             self.set_reg(reg, term)
-            addr, is_new = self.var_addr(term, is_head=True)
+            addr, alloc_addr = self.var_addr(term, is_head=True)
             if addr == reg:
                 # Filter no-op Get instructions that wouldn't move values around.
                 return
-            instr = GetVariable(reg, addr) if is_new else GetValue(reg, addr)
+            instr = GetValue(reg, addr) if alloc_addr == AddrAlloc.EXISTING else GetVariable(reg, addr)
             yield instr
             self.free_regs.add(reg)
         elif isinstance(term, Struct):
@@ -315,8 +323,8 @@ class ChunkCompiler:
         if isinstance(term, Atom):
             yield UnifyAtom(term)
         elif isinstance(term, Var):
-            addr, is_new = self.var_addr(term)
-            instr = UnifyVariable(addr) if is_new else UnifyValue(addr)
+            addr, alloc_addr = self.var_addr(term)
+            instr = UnifyValue(addr) if alloc_addr == AddrAlloc.EXISTING else UnifyVariable(addr)
             yield instr
         elif isinstance(term, Struct):
             addr, _ = self.temp_addr(term)
@@ -342,11 +350,11 @@ class ChunkCompiler:
         if isinstance(term, Atom):
             yield PutAtom(reg, term)
         elif isinstance(term, Var):
-            addr, is_new = self.var_addr(term)
-            if not is_new and addr == reg:
+            addr, alloc_addr = self.var_addr(term)
+            if alloc_addr == AddrAlloc.EXISTING and addr == reg:
                 # Filter no-op PutValue instruction that wouldn't move value around.
                 return
-            instr = PutVariable(reg, addr) if is_new else PutValue(reg, addr)
+            instr = PutValue(reg, addr) if alloc_addr == AddrAlloc.EXISTING else PutVariable(reg, addr)
             yield instr
             if isinstance(addr, Register):
                 self.free_regs.add(addr)
@@ -357,39 +365,39 @@ class ChunkCompiler:
                 if isinstance(arg, Var):
                     delayed_vars.append(arg)
                 elif isinstance(arg, Struct):
-                    addr, is_new = self.temp_addr(arg)
-                    if is_new:
-                        self.put_term(arg, addr)
+                    addr, alloc_addr = self.temp_addr(arg)
+                    if alloc_addr == AddrAlloc.NEW_STRUCT:
+                        yield from self.put_term(arg, addr)
                     yield UnifyValue(addr)
                 else:
                     yield from self.unify_arg(arg)
             for x in delayed_vars:
                 yield from self.unify_arg(x)
 
-    def term_addr(self, term: Term) -> Tuple[Addr, bool]:
+    def term_addr(self, term: Term) -> Tuple[Addr, AddrAlloc]:
         """Return address for a term."""
         if isinstance(term, Atom):
-            return AtomAddr(term), False
+            return AtomAddr(term), AddrAlloc.EXISTING
         if isinstance(term, Var):
             return self.var_addr(term)
         if isinstance(term, Struct):
             return self.temp_addr(term)
         raise NotImplementedError(f"term_addr: unhandled term type {type(term)}")
 
-    def var_addr(self, x: Var, *, is_head: bool = False) -> Tuple[Addr, bool]:
+    def var_addr(self, x: Var, *, is_head: bool = False) -> Tuple[Addr, AddrAlloc]:
         """Return address for a variable."""
         if x in self.parent.perms:
             return self.parent.perm_addr(x)
         return self.temp_addr(x, is_head=is_head)
 
-    def temp_addr(self, x: Union[Var, Struct], *, is_head: bool = False) -> Tuple[Register, bool]:
+    def temp_addr(self, x: Union[Var, Struct], *, is_head: bool = False) -> Tuple[Register, AddrAlloc]:
         """Return register for a variable or struct.
 
         Debray's allocation algorithm seeks to put address in registers used by the variable
         (either in first or last goals of chunk), and avoid registers used by other variables (NOUSE set)
         or any term in the last goal (CONFLICT set)."""
         if x in self.temp_addrs:
-            return self.temp_addrs[x], False
+            return self.temp_addrs[x], AddrAlloc.EXISTING
 
         use, no_use = self.use[x], self.no_use[x]
         if not is_head:
@@ -397,7 +405,9 @@ class ChunkCompiler:
 
         addr = self.alloc_reg(x, use, no_use)
         self.set_reg(addr, x)
-        return addr, True
+
+        alloc = AddrAlloc.NEW_VAR if isinstance(x, Var) else AddrAlloc.NEW_STRUCT
+        return addr, alloc
 
     def alloc_reg(self, x: Union[Var, Struct], use: Set[Register], no_use: Set[Register]) -> Register:
         """Allocate a register for a variable or struct."""
