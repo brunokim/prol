@@ -4,12 +4,17 @@ We don't implement all WAM instructions, specially those related to unsafe/local
 All memory cells are Python objects, so we don't need to worry about a stack cell pointing to a heap
 cell.
 
-We use Debray's algorithm to allocate registers [1]."""
+We use Debray's algorithm to allocate registers, explained in
+
+Register allocation in a Prolog Machine
+Saumya K. Debray
+Symposium of Logic Programming, 1986
+"""
 
 from collections import defaultdict
 from enum import Enum, auto
 from model import *
-from typing import cast, Sequence, Dict, Iterator, Tuple, Set, List, Union
+from typing import cast, Sequence, Dict, Iterator, Tuple, Set, List, Union, MutableMapping
 from operator import attrgetter
 
 
@@ -21,6 +26,23 @@ except ImportError:
     def parametrize(args, data):
         print("@parametrize stub")
         return lambda f: f
+
+
+Code = List[Instruction]
+
+
+class PackageCompiler:
+    def __init__(self, *clauses: Clause):
+        self.clauses = clauses
+
+    def compile(self) -> MutableMapping[Functor, List[Code]]:
+        m = defaultdict(list)  # Dict[Functor, List[Code]]
+        for clause in self.clauses:
+            functor = clause.head.functor()
+            compiler = ClauseCompiler(clause)
+            code = list(compiler.compile())
+            m[functor].append(code)
+        return m
 
 
 def term_vars(term: Term) -> Iterator[Var]:
@@ -269,9 +291,10 @@ class ChunkCompiler:
         last_goal = terms[-1]
         if last_goal.functor() in builtins:
             builtin_goals = terms
-            last_goal = None
+            is_last_builtin = True
         else:
             builtin_goals = terms[:-1]
+            is_last_builtin = False
 
         # Compile intermediate, builtin goals.
         # TODO: free registers from temp variables that are last referenced
@@ -287,7 +310,7 @@ class ChunkCompiler:
             yield Builtin([name, *addrs])
 
         # Issue put instructions and predicate call for non-builtin goal.
-        if last_goal is not None:
+        if not is_last_builtin:
             for i, arg in enumerate(last_goal.args):
                 yield from self.put_term(arg, Register(i), top_level=True)
             yield Call(last_goal.functor())
@@ -312,7 +335,8 @@ class ChunkCompiler:
             yield GetAtom(reg, term)
             self.free_regs.add(reg)
         elif isinstance(term, Var):
-            self.set_reg(reg, term)
+            if term not in self.temp_addrs:
+                self.set_reg(reg, term)
             addr, alloc_addr = self.var_addr(term, is_head=True)
             if addr == reg:
                 # Filter no-op Get instructions that wouldn't move values around.

@@ -223,3 +223,7 @@ class UnifyAtom(UnifyInstr):
 class Call(Instruction):
     name = "call"
     functor: Functor
+
+@dataclass
+class Halt(Instruction):
+    name = "halt"
