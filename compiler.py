@@ -16,6 +16,7 @@ from enum import Enum, auto
 from model import *
 from typing import cast, Sequence, Dict, Iterator, Tuple, Set, List, Union, MutableMapping
 from operator import attrgetter
+from dataclasses import field
 
 
 try:
@@ -28,7 +29,36 @@ except ImportError:
         return lambda f: f
 
 
-Code = List[Instruction]
+@dataclass
+class Code:
+    functor: Functor
+    instructions: List[Instruction]
+    num_regs: int = field(init=False)
+
+    def __post_init__(self):
+        max_reg, max_perm = -1, -1
+        for instr in self.instructions:
+            # Try to read register from .reg field
+            try:
+                max_reg = max(max_reg, instr.reg.index)
+            except AttributeError:
+                pass
+
+            # Try to read address from .addr field
+            try:
+                addr = instr.addr
+                if isinstance(addr, Register):
+                    max_reg = max(max_reg, addr.index)
+                if isinstance(addr, StackAddr):
+                    max_perm = max(max_perm, addr.index)
+            except AttributeError:
+                pass
+
+        self.num_regs = max_reg + 1
+
+        if max_perm >= 0:
+            self.instructions.insert(0, Allocate(max_perm+1))
+            self.instructions.append(Deallocate())
 
 
 class PackageCompiler:
@@ -40,7 +70,7 @@ class PackageCompiler:
         for clause in self.clauses:
             functor = clause.head.functor()
             compiler = ClauseCompiler(clause)
-            code = list(compiler.compile())
+            code = Code(functor, list(compiler.compile()))
             m[functor].append(code)
         return m
 

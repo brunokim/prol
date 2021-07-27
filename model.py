@@ -224,6 +224,19 @@ class Call(Instruction):
     name = "call"
     functor: Functor
 
+
 @dataclass
 class Halt(Instruction):
     name = "halt"
+
+
+@dataclass
+class Allocate(Instruction):
+    name = "allocate"
+    num_perms: int
+
+
+@dataclass
+class Deallocate(Instruction):
+    name = "deallocate"
+
