@@ -8,7 +8,11 @@ from typing import Mapping, List, Optional, Iterator, Tuple
 
 
 class Cell:
-    pass
+    def deref(self):
+        return self
+
+    def to_term(self) -> Term:
+        raise NotImplementedError("{type(self)}.to_term")
 
 
 @dataclass
@@ -16,28 +20,46 @@ class Ref(Cell):
     id_: int
     value: Optional[Cell] = None
 
+    def deref(self):
+        if self.value is None:
+            return self
+        return self.value
+
+    def to_term(self) -> Term:
+        if self.value is None:
+            return Var(f"_X{self._id}")
+        return self.value.to_term()
+    
 
 @dataclass
 class AtomCell(Cell):
     value: Atom
 
+    def to_term(self) -> Term:
+        return self.value
+
 
 @dataclass
 class StructCell(Cell):
     name: str
-    args: List[Cell]
+    args: List[Optional[Cell]]
 
     @property
     def arity(self) -> int:
         return len(self.args)
 
+    def functor(self) -> Functor:
+        return Functor(self.name, self.arity)
+
     @classmethod
     def from_functor(cls, f: Functor) -> "StructCell":
         return StructCell(f.name, [None for _ in range(f.arity)])
 
-
-def to_term(cell: Cell) -> Term:
-    return Atom("a")
+    def to_term(self) -> Term:
+        args = [
+            arg.to_term() if arg is not None else Atom("<nil>")
+            for arg in self.args]
+        return Struct(self.name, *args)
 
 
 @dataclass
@@ -107,6 +129,7 @@ class Machine:
         self.index[query_code.functor] = [query_code]
         self.instr_ptr = InstrAddr(query_code.functor)
         self.query_vars = query_vars
+        self.max_iter = 100
 
         num_regs = 0
         for codes in self.index.values():
@@ -130,50 +153,76 @@ class Machine:
         return code.instructions[ptr.instr]
 
     def run(self) -> Iterator[Solution]:
-#        try:
-            while self.instr_ptr:
-                instr = self.instr()
-                if isinstance(instr, Halt):
-                    if self.state.env is not None:
-                        yield {x: to_term(cell) for x, cell in zip(self.query_vars, self.state.env.slots)}
-                    self.backtrack()
-                elif isinstance(instr, Allocate):
-                    self.state.env = Env(
-                        slots = [None for _ in range(instr.num_perms)],
-                        continuation = self.state.continuation,
-                        cut_choice = self.state.cut_choice,
-                        prev = self.state.env,
-                    )
-                    self.state.continuation = None
-                    self.forward()
-                elif isinstance(instr, Deallocate):
-                    self.state.continuation = self.state.env.continuation
-                    self.state.env = self.state.env.prev
-                    self.forward()
-                elif isinstance(instr, GetVariable):
-                    self.set(instr.addr, self.get_reg(instr.reg))
-                    self.forward()
-                elif isinstance(instr, PutVariable):
-                    x = self.new_ref()
-                    self.set_reg(instr.reg, x)
-                    self.set(instr.addr, x)
-                    self.forward()
-                elif isinstance(instr, PutStruct):
-                    s = StructCell.from_functor(instr.functor)
-                    self.set_reg(instr.reg, s)
-                    self.state.struct_arg = StructArg(StructArgMode.WRITE, s)
-                    self.forward()
-                elif isinstance(instr, (UnifyVariable, UnifyValue, UnifyAtom)):
-                    self.unify_arg(instr)
-                else:
-                    raise NotImplementedError(f"Machine.run: not implemented for instr type {type(instr)}")
-#        except Exception as e:
-#            print(e)
+        iterations = 0
+        try:
+            while self.instr_ptr and iterations < self.max_iter:
+                yield from self.run_instr(self.instr())
+                iterations += 1
+        except Exception as e:
+            import traceback
+            traceback.print_tb(e.__traceback__)
+            print(e)
+
+    def run_instr(self, instr: Instruction) -> Iterator[Solution]:
+        print(instr)
+        try:
+            if isinstance(instr, Halt):
+                if self.state.env is not None:
+                    yield {x: to_term(cell) for x, cell in zip(self.query_vars, self.state.env.slots)}
+                self.backtrack()
+            elif isinstance(instr, Call):
+                self.forward()
+                self.state.continuation = self.instr_ptr
+                self.state.cut_choice = self.choice
+                self.instr_ptr = InstrAddr(instr.functor)
+            elif isinstance(instr, Allocate):
+                self.state.env = Env(
+                    slots = [None for _ in range(instr.num_perms)],
+                    continuation = self.state.continuation,
+                    cut_choice = self.state.cut_choice,
+                    prev = self.state.env,
+                )
+                self.state.continuation = None
+                self.forward()
+            elif isinstance(instr, Deallocate):
+                self.state.continuation = self.state.env.continuation
+                self.state.env = self.state.env.prev
+                self.forward()
+            elif isinstance(instr, GetVariable):
+                self.set(instr.addr, self.get_reg(instr.reg))
+                self.forward()
+            elif isinstance(instr, GetValue):
+                self.try_unify(self.get_reg(instr.reg), self.get(instr.addr))
+            elif isinstance(instr, GetAtom):
+                self.read_atom(instr.atom, self.get(instr.reg))
+            elif isinstance(instr, PutVariable):
+                x = self.new_ref()
+                self.set_reg(instr.reg, x)
+                self.set(instr.addr, x)
+                self.forward()
+            elif isinstance(instr, PutStruct):
+                s = StructCell.from_functor(instr.functor)
+                self.set_reg(instr.reg, s)
+                self.state.struct_arg = StructArg(StructArgMode.WRITE, s)
+                self.forward()
+            elif isinstance(instr, (UnifyVariable, UnifyValue, UnifyAtom)):
+                self.unify_arg(instr)
+            else:
+                raise NotImplementedError(f"Machine.run: not implemented for instr type {type(instr)}")
+        except UnifyError as e:
+            self.backtrack()
 
     def forward(self):
         self.instr_ptr.instr += 1
 
     def backtrack(self):
+        # Try next clause in predicate
+        predicate = self.index[self.instr_ptr.functor]
+        if self.instr_ptr.order < len(predicate)-1:
+            self.instr_ptr.order += 1
+            self.instr_ptr.instr = 0
+            return
+
         if not self.choice:
             raise NoMoreChoices()
         self.cut_choice = self.choice.machine_state.cut_choice
@@ -225,12 +274,13 @@ class Machine:
             raise CompilerError(f"Machine.get_stack: reading uninitialized memory at {addr}")
         return value
 
-    def unify_arg(self, instr: Instruction):
+    def unify_arg(self, instr: Instruction) -> InstrAddr:
         struct_arg = self.state.struct_arg
 
         if struct_arg.mode == StructArgMode.WRITE:
             arg = self.write_arg(instr)
             struct_arg.struct.args[struct_arg.index] = arg
+            self.forward()
         elif struct_arg.mode == StructArgMode.READ:
             arg = struct_arg.struct.args[struct_arg.index]
             self.read_arg(instr, arg)
@@ -240,13 +290,77 @@ class Machine:
         struct_arg.index += 1
         if struct_arg.index >= struct_arg.struct.arity:
             self.struct_arg = StructArg(StructArgMode.INVALID, None)
-        self.forward()
 
     def write_arg(self, instr: Instruction) -> Cell:
-        pass
+        if isinstance(instr, UnifyVariable):
+            x = self.new_ref()
+            self.set(instr.addr, x)
+            return x
+        if isinstance(instr, UnifyValue):
+            return self.get(instr.addr)
+        if isinstance(instr, UnifyAtom):
+            return instr.atom
+        raise NotImplementedError(f"Machine.write_arg: not implemented for instruction {instr}")
 
     def read_arg(self, instr: Instruction, arg: Cell):
-        pass
+        if isinstance(instr, UnifyVariable):
+            self.set(instr.addr, arg)
+            self.forward()
+        elif isinstance(instr, UnifyValue):
+            cell = self.get(instr.addr)
+            self.try_unify(cell, arg)
+        elif isinstance(instr, UnifyAtom):
+            self.read_atom(instr.atom, arg)
+        else:
+            raise NotImplementedError(f"Machine.read_arg: not implemented for instruction {instr}")
+
+    def read_atom(self, atom: Atom, arg: Cell):
+        cell = arg.deref()
+        if isinstance(cell, AtomCell):
+            if cell != atom:
+                raise UnifyError(atom, cell)
+        elif isinstance(cell, Ref):
+            self.bind_ref(cell, atom)
+        else:
+            raise UnifyError(atom, cell)
+        self.forward()
+
+    def try_unify(c1: Cell, c2: Cell):
+        stack = [(c1, c2)]
+        while stack:
+            c1, c2 = stack.pop()
+            c1, c2 = c1.deref(), c2.deref()
+            if c1 == c2:
+                continue
+            if isinstance(c1, Ref) or isinstance(c2, Ref):
+                if isinstance(c1, Ref) and c1.Value is None:
+                    # Always bind older (lower id) to newer (higher id) ref.
+                    if not isinstance(c2, Ref) or c2._id < c1._id:
+                        ref, value = c1, c2
+                    else:
+                        ref, value = c2, c1
+                elif isinstance(c2, Ref) and c2.Value is None:
+                    ref, value = c2, c1
+                else:
+                    raise CompilerError(f"No unbound refs: {c1}, {c2}")
+                self.bind_ref(ref, value)
+            elif isinstance(c1, AtomCell):
+                if not isinstance(c2, AtomCell) or c1.atom != c2.atom:
+                    raise UnifyError(c1, c2)
+            elif isinstance(c1, StructCell):
+                if not isinstance(c2, StructCell):
+                    raise UnifyError(c1, c2)
+                f1, f2 = c1.functor(), c2.functor()
+                if f1 != f2:
+                    raise UnifyError(f1, f2)
+                stack.extend(zip(c1.args, c2.args))
+            else:
+                raise CompilerError(f"Machine.unify: unhandled type {type(c1)}")
+        self.forward()
+
+    def bind_ref(self, ref: Ref, value: Cell):
+        ref.value = value
+        self.trail(ref)
 
     def __str__(self):
         s = ""
@@ -260,8 +374,21 @@ class Machine:
         return s[:-1]  # Remove last newline
 
 
+class NoMoreChoices(Exception):
+    pass
+
+
 class CompilerError(Exception):
     pass
+
+
+class UnifyError(Exception):
+    def __init__(self, c1, c2):
+        self.c1 = c1
+        self.c2 = c2
+
+    def __str__(self):
+        return f"{self.c1} != {self.c2}"
 
 
 def main():
