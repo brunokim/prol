@@ -319,12 +319,11 @@ class ChunkCompiler:
             return
 
         last_goal = terms[-1]
-        if last_goal.functor() in builtins:
+        is_last_builtin = (last_goal.functor() in builtins)
+        if is_last_builtin:
             builtin_goals = terms
-            is_last_builtin = True
         else:
             builtin_goals = terms[:-1]
-            is_last_builtin = False
 
         # Compile intermediate, builtin goals.
         # TODO: free registers from temp variables that are last referenced
@@ -427,20 +426,22 @@ class ChunkCompiler:
             if isinstance(addr, Register):
                 self.free_regs.add(addr)
         elif isinstance(term, Struct):
-            yield PutStruct(reg, term.functor())
-            delayed_vars = []  # type: List[Var]
+            nested_structs = {} # type: Dict[Struct, Addr]
             for arg in term.args:
-                if isinstance(arg, Var):
-                    delayed_vars.append(arg)
-                elif isinstance(arg, Struct):
-                    addr, alloc_addr = self.temp_addr(arg)
-                    if alloc_addr == AddrAlloc.NEW_STRUCT:
-                        yield from self.put_term(arg, addr)
-                    yield UnifyValue(addr)
+                if isinstance(arg, Struct):
+                    nested_structs[arg] = None
+            for struct in nested_structs:
+                addr, alloc_addr = self.temp_addr(struct)
+                if alloc_addr == AddrAlloc.NEW_STRUCT:
+                    yield from self.put_term(arg, addr)
+                nested_structs[struct] = addr
+
+            yield PutStruct(reg, term.functor())
+            for arg in term.args:
+                if isinstance(arg, Struct):
+                    yield UnifyValue(nested_structs[arg])
                 else:
                     yield from self.unify_arg(arg)
-            for x in delayed_vars:
-                yield from self.unify_arg(x)
         else:
             raise NotImplementedError(f"put_term: unhandled term type {type(term)}")
 
@@ -624,6 +625,18 @@ testdata = [
      unify_atom a
             \== Y2, X0
               = Y1, Y2
+     """),
+    (Clause(Struct("query"),
+        Struct("length", Var("L"), Struct("s", Struct("s", Struct("s", Atom("0")))))),
+     """
+        put_var X0, X0
+     put_struct X1, s/1
+     unify_atom 0
+     put_struct X0, s/1
+      unify_val X1
+     put_struct X1, s/1
+      unify_val X0
+           call length/2
      """),
 ]
 
