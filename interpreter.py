@@ -14,6 +14,12 @@ class Cell:
     def to_term(self) -> Term:
         raise NotImplementedError("{type(self)}.to_term")
 
+    def __str__(self):
+        return f"@{self.to_term()}"
+    
+    def __repr__(self):
+        return str(self)
+
 
 @dataclass
 class Ref(Cell):
@@ -27,7 +33,7 @@ class Ref(Cell):
 
     def to_term(self) -> Term:
         if self.value is None:
-            return Var(f"_X{self._id}")
+            return Var(f"_X{self.id_}")
         return self.value.to_term()
     
 
@@ -60,6 +66,7 @@ class StructCell(Cell):
             arg.to_term() if arg is not None else Atom("<nil>")
             for arg in self.args]
         return Struct(self.name, *args)
+
 
 
 @dataclass
@@ -195,6 +202,19 @@ class Machine:
                 self.try_unify(self.get_reg(instr.reg), self.get(instr.addr))
             elif isinstance(instr, GetAtom):
                 self.read_atom(instr.atom, self.get(instr.reg))
+            elif isinstance(instr, GetStruct):
+                cell = self.get(instr.reg).deref()
+                if isinstance(cell, StructCell):
+                    if cell.functor() != instr.functor:
+                        raise UnifyError(cell.functor(), instr.functor)
+                    self.state.struct_arg = StructArg(StructArgMode.READ, cell)
+                elif isinstance(cell, Ref):
+                    struct = StructCell.from_functor(instr.functor)
+                    self.bind_ref(cell, struct)
+                    self.state.struct_arg = StructArg(StructArgMode.WRITE, struct)
+                else:
+                    raise UnifyError(cell, instr.functor)
+                self.forward()
             elif isinstance(instr, PutVariable):
                 x = self.new_ref()
                 self.set_reg(instr.reg, x)
@@ -210,6 +230,7 @@ class Machine:
             else:
                 raise NotImplementedError(f"Machine.run: not implemented for instr type {type(instr)}")
         except UnifyError as e:
+            print(e)
             self.backtrack()
 
     def forward(self):
@@ -233,6 +254,7 @@ class Machine:
         return Ref(self.state.top_ref_id)
 
     def set(self, addr: Addr, cell: Cell):
+        print(f"{addr} := {cell}")
         if isinstance(addr, Register):
             self.set_reg(addr, cell)
         elif isinstance(addr, StackAddr):
@@ -279,6 +301,7 @@ class Machine:
 
         if struct_arg.mode == StructArgMode.WRITE:
             arg = self.write_arg(instr)
+            print(f"{struct_arg.struct.name}[{struct_arg.index}] := {arg}")
             struct_arg.struct.args[struct_arg.index] = arg
             self.forward()
         elif struct_arg.mode == StructArgMode.READ:
@@ -299,7 +322,7 @@ class Machine:
         if isinstance(instr, UnifyValue):
             return self.get(instr.addr)
         if isinstance(instr, UnifyAtom):
-            return instr.atom
+            return AtomCell(instr.atom)
         raise NotImplementedError(f"Machine.write_arg: not implemented for instruction {instr}")
 
     def read_arg(self, instr: Instruction, arg: Cell):
@@ -335,7 +358,7 @@ class Machine:
             if isinstance(c1, Ref) or isinstance(c2, Ref):
                 if isinstance(c1, Ref) and c1.Value is None:
                     # Always bind older (lower id) to newer (higher id) ref.
-                    if not isinstance(c2, Ref) or c2._id < c1._id:
+                    if not isinstance(c2, Ref) or c2.id_ < c1.id_:
                         ref, value = c1, c2
                     else:
                         ref, value = c2, c1
@@ -359,6 +382,8 @@ class Machine:
         self.forward()
 
     def bind_ref(self, ref: Ref, value: Cell):
+        if ref.value is not None:
+            raise CompilerError(f"Machine.bind_ref: ref is bound {ref}")
         ref.value = value
         self.trail(ref)
 
