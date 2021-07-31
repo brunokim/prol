@@ -342,6 +342,7 @@ class ChunkCompiler:
         if not is_last_builtin:
             for i, arg in enumerate(last_goal.args):
                 yield from self.put_term(arg, Register(i), top_level=True)
+                self.free_regs.discard(Register(i))
             yield Call(last_goal.functor())
 
     def compile_head(self, head: Struct) -> Iterator[Instruction]:
@@ -402,6 +403,7 @@ class ChunkCompiler:
         Debray's allocation method lets variables as long as possible in the register.
         If we were to put a term in the same register, we need to move it first
         elsewhere."""
+
         addr: Addr
         # Conflict resolution: move content out of register if in conflict.
         if top_level:
@@ -430,6 +432,8 @@ class ChunkCompiler:
             for arg in term.args:
                 if isinstance(arg, Struct):
                     nested_structs[arg] = None
+
+            self.free_regs.discard(reg)  # Reserve reg for put_struct instruction.
             for struct in nested_structs:
                 addr, alloc_addr = self.temp_addr(struct)
                 if alloc_addr == AddrAlloc.NEW_STRUCT:
@@ -630,12 +634,12 @@ testdata = [
         Struct("length", Var("L"), Struct("s", Struct("s", Struct("s", Atom("0")))))),
      """
         put_var X0, X0
-     put_struct X1, s/1
+     put_struct X3, s/1
      unify_atom 0
-     put_struct X0, s/1
-      unify_val X1
+     put_struct X2, s/1
+      unify_val X3
      put_struct X1, s/1
-      unify_val X0
+      unify_val X2
            call length/2
      """),
 ]
