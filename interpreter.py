@@ -33,7 +33,7 @@ class Ref(Cell):
 
     def to_term(self) -> Term:
         if self.value is None:
-            return Var(f"_X{self.id_}")
+            return Var(f"_{self.id_}")
         return self.value.to_term()
     
 

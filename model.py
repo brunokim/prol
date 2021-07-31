@@ -25,6 +25,9 @@ class Var(Term):
     def __eq__(self, other):
         return isinstance(other, Var) and self.name == other.name
 
+    def __repr__(self):
+        return f"Var({self.name!r})"
+
 
 class Atom(Term):
     def __init__(self, name: str):
@@ -40,6 +43,9 @@ class Atom(Term):
 
     def __eq__(self, other):
         return isinstance(other, Atom) and self.name == other.name
+
+    def __repr__(self):
+        return f"Atom({self.name!r})"
 
 
 @dataclass(frozen=True)
@@ -74,6 +80,12 @@ class Struct(Term):
 
     def __eq__(self, other):
         return isinstance(other, Struct) and self.name == other.name and self.args == other.args
+
+    def __repr__(self):
+        if not self.args:
+            return f"Struct({self.name!r})"
+        args = ", ".join(repr(arg) for arg in self.args)
+        return f"Struct({self.name!r}, {args})"
 
 
 class Clause:
