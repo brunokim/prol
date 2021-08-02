@@ -36,11 +36,11 @@ class Code:
     num_regs: int = field(init=False)
 
     def __post_init__(self):
-        max_reg, max_perm = -1, -1
+        regs, perms = set(), set()
         for instr in self.instructions:
             # Try to read register from .reg field
             try:
-                max_reg = max(max_reg, instr.reg.index)
+                regs.add(instr.reg)
             except AttributeError:
                 pass
 
@@ -48,17 +48,40 @@ class Code:
             try:
                 addr = instr.addr
                 if isinstance(addr, Register):
-                    max_reg = max(max_reg, addr.index)
+                    regs.add(addr)
                 if isinstance(addr, StackAddr):
-                    max_perm = max(max_perm, addr.index)
+                    perms.add(addr)
             except AttributeError:
                 pass
 
-        self.num_regs = max_reg + 1
+        self.num_regs = max(reg.index for reg in regs) + 1
 
-        if max_perm >= 0:
-            self.instructions.insert(0, Allocate(max_perm+1))
+        # Check locations of 'call' instructions
+        call_idxs = [i
+                     for i, instr in enumerate(self.instructions)
+                     if isinstance(instr, Call)]
+        last_idx = len(self.instructions)-1
+        has_last_call = (last_idx in call_idxs)
+        has_nonlast_call = any(idx != last_idx for idx in call_idxs)
+
+        if has_last_call:
+            # Replace 'call' with 'execute' in final position to save on an
+            # environment.
+            call = self.instructions.pop()
+            self.instructions.append(Execute(call.functor))
+        else:
+            # Facts and bodies that don't end with 'call' need a 'proceed' instruction
+            # to trampoline into continuation. 
+            self.instructions.append(Proceed())
+
+        # Clauses with permanent variables or non-last calls need an environment.
+        if perms or has_nonlast_call:
+            self.instructions.insert(0, Allocate(len(perms)))
+
+            # Deallocate environment before continuing to next clause.
+            last_instr = self.instructions.pop()
             self.instructions.append(Deallocate())
+            self.instructions.append(last_instr)
 
 
 class PackageCompiler:

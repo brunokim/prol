@@ -175,15 +175,19 @@ class Machine:
                 if self.state.env is not None:
                     yield {x: to_term(cell) for x, cell in zip(self.query_vars, self.state.env.slots)}
                 self.backtrack()
-            elif isinstance(instr, Call):
-                self.forward()
-                self.state.continuation = self.state.instr_ptr
+            elif isinstance(instr, (Call, Execute)):
+                if isinstance(instr, Call):
+                    self.state.continuation = self.state.instr_ptr
+                    self.state.continuation.instr += 1
                 self.state.instr_ptr = InstrAddr(instr.functor)
 
                 if len(self.index[instr.functor]) > 1:
                     # More than one clause for predicate requires pushing a
                     # choice point. 
                     self.choice = Choice(state=deepcopy(self.state), prev=self.choice)
+            elif isinstance(instr, Proceed):
+                self.state.instr_ptr = self.state.continuation
+                self.state.continuation = None
             elif isinstance(instr, Allocate):
                 self.state.env = Env(
                     slots = [None for _ in range(instr.num_perms)],
@@ -231,11 +235,20 @@ class Machine:
             else:
                 raise NotImplementedError(f"Machine.run: not implemented for instr type {type(instr)}")
         except UnifyError as e:
-            print(e)
+            print(f"                         {e}")
             self.backtrack()
 
     def forward(self):
-        self.state.instr_ptr.instr += 1
+        ptr = self.state.instr_ptr
+        code = self.index[ptr.functor][ptr.order]
+        print(f"                         {ptr.functor}:{ptr.order}:{ptr.instr}")
+        if ptr.instr == len(code.instructions)-1:
+            # End of code, return to continuation
+            ptr = self.state.continuation
+            self.state.continuation = None
+            print(f"                        >{ptr.functor}:{ptr.order}:{ptr.instr}")
+        ptr.instr += 1
+        self.state.instr_ptr = ptr
 
     def backtrack(self):
         if not self.choice:
@@ -254,7 +267,7 @@ class Machine:
         return Ref(self.state.top_ref_id)
 
     def set(self, addr: Addr, cell: Cell):
-        print(f"{addr} := {cell}")
+        print(f"                         {addr} := {cell}")
         if isinstance(addr, Register):
             self.set_reg(addr, cell)
         elif isinstance(addr, StackAddr):
@@ -301,7 +314,7 @@ class Machine:
 
         if struct_arg.mode == StructArgMode.WRITE:
             arg = self.write_arg(instr)
-            print(f"{struct_arg.struct.name}[{struct_arg.index}] := {arg}")
+            print(f"                         {struct_arg.struct.name}[{struct_arg.index}] := {arg}")
             struct_arg.struct.args[struct_arg.index] = arg
             self.forward()
         elif struct_arg.mode == StructArgMode.READ:
@@ -340,8 +353,8 @@ class Machine:
     def read_atom(self, atom: Atom, arg: Cell):
         cell = arg.deref()
         if isinstance(cell, AtomCell):
-            if cell != atom:
-                raise UnifyError(atom, cell)
+            if cell.value != atom:
+                raise UnifyError(atom, cell.value)
         elif isinstance(cell, Ref):
             self.bind_ref(cell, atom)
         else:
@@ -384,6 +397,7 @@ class Machine:
     def bind_ref(self, ref: Ref, value: Cell):
         if ref.value is not None:
             raise CompilerError(f"Machine.bind_ref: ref is bound {ref}")
+        print(f"                         {ref} = {value}")
         ref.value = value
         self.trail(ref)
 

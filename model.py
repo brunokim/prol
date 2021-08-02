@@ -238,6 +238,17 @@ class Call(Instruction):
 
 
 @dataclass
+class Execute(Instruction):
+    name = "execute"
+    functor: Functor
+
+
+@dataclass
+class Proceed(Instruction):
+    name = "proceed"
+
+
+@dataclass
 class Halt(Instruction):
     name = "halt"
 
