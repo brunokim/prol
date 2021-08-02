@@ -5,6 +5,7 @@ from enum import Enum, auto
 from model import *
 from compiler import ClauseCompiler, PackageCompiler, Code
 from typing import Mapping, List, Optional, Iterator, Tuple
+from copy import copy, deepcopy
 
 
 class Cell:
@@ -91,25 +92,23 @@ class StructArg:
 
 @dataclass
 class MachineState:
+    instr_ptr: InstrAddr
     regs: List[Optional[Cell]]
     top_ref_id: int
     struct_arg: StructArg
     continuation: Optional[InstrAddr]
     env: Optional["Env"]
-    cut_choice: Optional["Choice"]
 
 
 @dataclass
 class Env:
     slots: List[Cell]
     continuation: InstrAddr
-    cut_choice: Optional["Choice"] = None
     prev: Optional["Env"] = None
 
 
 @dataclass
 class Choice:
-    alternative: InstrAddr
     state: MachineState
     trail: List[Ref] = field(default_factory=list)
     prev: Optional["Choice"] = None
@@ -134,7 +133,6 @@ class Machine:
         self.index = PackageCompiler(*package).compile()
         query_code, query_vars = compile_query(query)
         self.index[query_code.functor] = [query_code]
-        self.instr_ptr = InstrAddr(query_code.functor)
         self.query_vars = query_vars
         self.max_iter = 100
 
@@ -145,16 +143,16 @@ class Machine:
 
         self.choice: Optional[Choice] = None
         self.state = MachineState(
+            instr_ptr = InstrAddr(query_code.functor),
             regs = [None for _ in range(num_regs)],
             top_ref_id = 0,
             struct_arg = StructArg(StructArgMode.INVALID),
             continuation = None,
             env = None,
-            cut_choice = None,
         )
 
     def instr(self) -> Instruction:
-        ptr = self.instr_ptr
+        ptr = self.state.instr_ptr
         predicate = self.index[ptr.functor]
         code = predicate[ptr.order]
         return code.instructions[ptr.instr]
@@ -162,7 +160,7 @@ class Machine:
     def run(self) -> Iterator[Solution]:
         iterations = 0
         try:
-            while self.instr_ptr and iterations < self.max_iter:
+            while iterations < self.max_iter:
                 yield from self.run_instr(self.instr())
                 iterations += 1
         except Exception as e:
@@ -179,14 +177,17 @@ class Machine:
                 self.backtrack()
             elif isinstance(instr, Call):
                 self.forward()
-                self.state.continuation = self.instr_ptr
-                self.state.cut_choice = self.choice
-                self.instr_ptr = InstrAddr(instr.functor)
+                self.state.continuation = self.state.instr_ptr
+                self.state.instr_ptr = InstrAddr(instr.functor)
+
+                if len(self.index[instr.functor]) > 1:
+                    # More than one clause for predicate requires pushing a
+                    # choice point. 
+                    self.choice = Choice(state=deepcopy(self.state), prev=self.choice)
             elif isinstance(instr, Allocate):
                 self.state.env = Env(
                     slots = [None for _ in range(instr.num_perms)],
                     continuation = self.state.continuation,
-                    cut_choice = self.state.cut_choice,
                     prev = self.state.env,
                 )
                 self.state.continuation = None
@@ -234,20 +235,19 @@ class Machine:
             self.backtrack()
 
     def forward(self):
-        self.instr_ptr.instr += 1
+        self.state.instr_ptr.instr += 1
 
     def backtrack(self):
-        # Try next clause in predicate
-        predicate = self.index[self.instr_ptr.functor]
-        if self.instr_ptr.order < len(predicate)-1:
-            self.instr_ptr.order += 1
-            self.instr_ptr.instr = 0
-            return
-
         if not self.choice:
             raise NoMoreChoices()
-        self.cut_choice = self.choice.machine_state.cut_choice
-        self.instr_ptr = self.choice.alternative
+        self.unwind_trail()
+        ptr = self.choice.state.instr_ptr
+        next_ptr = InstrAddr(ptr.functor, ptr.order+1)
+        self.state = deepcopy(self.choice.state)
+        self.state.instr_ptr = next_ptr
+        if len(self.index[ptr.functor])-1 == next_ptr.order:
+            # Last clause in predicate, pop last choice point for previous one.
+            self.choice = self.choice.prev
 
     def new_ref(self) -> Ref:
         self.state.top_ref_id += 1
@@ -386,6 +386,23 @@ class Machine:
             raise CompilerError(f"Machine.bind_ref: ref is bound {ref}")
         ref.value = value
         self.trail(ref)
+
+    def trail(self, ref: Ref):
+        if self.choice is None:
+            return
+        if not self.is_conditional(ref):
+            return
+        self.choice.trail.append(ref)
+
+    def is_conditional(self, ref: Ref) -> bool:
+        return self.choice.state.top_ref_id >= ref.id_
+
+    def unwind_trail(self):
+        if not self.choice:
+            return
+        for ref in self.choice.trail:
+            ref.value = None
+        self.choice.trail = []
 
     def __str__(self):
         s = ""
