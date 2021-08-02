@@ -163,13 +163,14 @@ class Machine:
             while iterations < self.max_iter:
                 yield from self.run_instr(self.instr())
                 iterations += 1
+        except NoMoreChoices:
+            pass
         except Exception as e:
             import traceback
             traceback.print_tb(e.__traceback__)
             print(e)
 
     def run_instr(self, instr: Instruction) -> Iterator[Solution]:
-        print(instr)
         try:
             if isinstance(instr, Halt):
                 if self.state.env is not None:
@@ -246,18 +247,15 @@ class Machine:
             else:
                 raise NotImplementedError(f"Machine.run: not implemented for instr type {type(instr)}")
         except UnifyError as e:
-            print(f"                         {e}")
             self.backtrack()
 
     def forward(self):
         ptr = self.state.instr_ptr
         code = self.index[ptr.functor][ptr.order]
-        print(f"                         {ptr.functor}:{ptr.order}:{ptr.instr}")
         if ptr.instr == len(code.instructions)-1:
             # End of code, return to continuation
             ptr = self.state.continuation
             self.state.continuation = None
-            print(f"                        >{ptr.functor}:{ptr.order}:{ptr.instr}")
         ptr.instr += 1
         self.state.instr_ptr = ptr
 
@@ -278,7 +276,6 @@ class Machine:
         return Ref(self.state.top_ref_id)
 
     def set(self, addr: Addr, cell: Cell):
-        print(f"                         {addr} := {cell}")
         if isinstance(addr, Register):
             self.set_reg(addr, cell)
         elif isinstance(addr, StackAddr):
@@ -328,7 +325,6 @@ class Machine:
         arg: Optional[Cell]
         if struct_arg.mode == StructArgMode.WRITE:
             arg = self.write_arg(instr)
-            print(f"                         {struct_arg.struct.name}[{struct_arg.index}] := {arg}")
             struct_arg.struct.args[struct_arg.index] = arg
             self.forward()
         elif struct_arg.mode == StructArgMode.READ:
@@ -416,7 +412,6 @@ class Machine:
     def bind_ref(self, ref: Ref, value: Cell):
         if ref.value is not None:
             raise CompilerError(f"Machine.bind_ref: ref is bound {ref}")
-        print(f"                         {ref} = {value}")
         ref.value = value
         self.trail(ref)
 
