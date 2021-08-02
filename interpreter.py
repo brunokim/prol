@@ -102,8 +102,8 @@ class MachineState:
 
 @dataclass
 class Env:
-    slots: List[Cell]
-    continuation: InstrAddr
+    slots: List[Optional[Cell]]
+    continuation: Optional[InstrAddr]
     prev: Optional["Env"] = None
 
 
@@ -173,6 +173,7 @@ class Machine:
         try:
             if isinstance(instr, Halt):
                 if self.state.env is not None:
+                    to_term = lambda cell: cell.to_term() if cell is not None else Atom("<nil>")
                     yield {x: to_term(cell) for x, cell in zip(self.query_vars, self.state.env.slots)}
                 self.backtrack()
             elif isinstance(instr, (Call, Execute)):
@@ -186,6 +187,8 @@ class Machine:
                     # choice point. 
                     self.choice = Choice(state=deepcopy(self.state), prev=self.choice)
             elif isinstance(instr, Proceed):
+                if self.state.continuation is None:
+                    raise CompilerError(f"proceed called without continuation")
                 self.state.instr_ptr = self.state.continuation
                 self.state.continuation = None
             elif isinstance(instr, Allocate):
@@ -197,6 +200,8 @@ class Machine:
                 self.state.continuation = None
                 self.forward()
             elif isinstance(instr, Deallocate):
+                if self.state.env is None:
+                    raise CompilerError(f"deallocate called without environment")
                 self.state.continuation = self.state.env.continuation
                 self.state.env = self.state.env.prev
                 self.forward()
@@ -224,6 +229,12 @@ class Machine:
                 x = self.new_ref()
                 self.set_reg(instr.reg, x)
                 self.set(instr.addr, x)
+                self.forward()
+            elif isinstance(instr, PutValue):
+                self.set_reg(instr.reg, self.get(instr.addr))
+                self.forward()
+            elif isinstance(instr, PutAtom):
+                self.set_reg(instr.reg, AtomCell(instr.atom))
                 self.forward()
             elif isinstance(instr, PutStruct):
                 s = StructCell.from_functor(instr.functor)
@@ -309,9 +320,12 @@ class Machine:
             raise CompilerError(f"Machine.get_stack: reading uninitialized memory at {addr}")
         return value
 
-    def unify_arg(self, instr: Instruction) -> InstrAddr:
+    def unify_arg(self, instr: Instruction):
         struct_arg = self.state.struct_arg
+        if struct_arg.struct is None:
+            raise CompilerError(f"Machine.unify_arg: struct is None")
 
+        arg: Optional[Cell]
         if struct_arg.mode == StructArgMode.WRITE:
             arg = self.write_arg(instr)
             print(f"                         {struct_arg.struct.name}[{struct_arg.index}] := {arg}")
@@ -319,6 +333,8 @@ class Machine:
             self.forward()
         elif struct_arg.mode == StructArgMode.READ:
             arg = struct_arg.struct.args[struct_arg.index]
+            if arg is None:
+                raise CompilerError(f"Machine.unify_arg: {struct_arg.struct.name}[#{struct_arg.index}] is Non")
             self.read_arg(instr, arg)
         else:
             raise NotImplementedError(f"Machine.unify_arg: not implemented for mode {struct_arg.mode}")
@@ -356,12 +372,12 @@ class Machine:
             if cell.value != atom:
                 raise UnifyError(atom, cell.value)
         elif isinstance(cell, Ref):
-            self.bind_ref(cell, atom)
+            self.bind_ref(cell, AtomCell(atom))
         else:
             raise UnifyError(atom, cell)
         self.forward()
 
-    def try_unify(c1: Cell, c2: Cell):
+    def try_unify(self, c1: Cell, c2: Cell):
         stack = [(c1, c2)]
         while stack:
             c1, c2 = stack.pop()
@@ -369,19 +385,19 @@ class Machine:
             if c1 == c2:
                 continue
             if isinstance(c1, Ref) or isinstance(c2, Ref):
-                if isinstance(c1, Ref) and c1.Value is None:
+                if isinstance(c1, Ref) and c1.value is None:
                     # Always bind older (lower id) to newer (higher id) ref.
                     if not isinstance(c2, Ref) or c2.id_ < c1.id_:
                         ref, value = c1, c2
                     else:
                         ref, value = c2, c1
-                elif isinstance(c2, Ref) and c2.Value is None:
+                elif isinstance(c2, Ref) and c2.value is None:
                     ref, value = c2, c1
                 else:
                     raise CompilerError(f"No unbound refs: {c1}, {c2}")
                 self.bind_ref(ref, value)
             elif isinstance(c1, AtomCell):
-                if not isinstance(c2, AtomCell) or c1.atom != c2.atom:
+                if not isinstance(c2, AtomCell) or c1.value != c2.value:
                     raise UnifyError(c1, c2)
             elif isinstance(c1, StructCell):
                 if not isinstance(c2, StructCell):
@@ -389,7 +405,10 @@ class Machine:
                 f1, f2 = c1.functor(), c2.functor()
                 if f1 != f2:
                     raise UnifyError(f1, f2)
-                stack.extend(zip(c1.args, c2.args))
+                for a1, a2 in zip(c1.args, c2.args):
+                    if a1 is None or a2 is None:
+                        raise CompilerError(f"Machine.try_unify: uninitialized struct")
+                    stack.append((a1, a2))
             else:
                 raise CompilerError(f"Machine.unify: unhandled type {type(c1)}")
         self.forward()
@@ -404,12 +423,12 @@ class Machine:
     def trail(self, ref: Ref):
         if self.choice is None:
             return
-        if not self.is_conditional(ref):
+        choice_top_ref_id = self.choice.state.top_ref_id
+        if choice_top_ref_id < ref.id_:
+            # Unconditional ref: ref is newer than current choice point, so will
+            # be recreated if we backtrack; there's no need to add it to the trail.
             return
         self.choice.trail.append(ref)
-
-    def is_conditional(self, ref: Ref) -> bool:
-        return self.choice.state.top_ref_id >= ref.id_
 
     def unwind_trail(self):
         if not self.choice:

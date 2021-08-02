@@ -57,12 +57,15 @@ class Code:
         self.num_regs = max(reg.index for reg in regs) + 1
 
         # Check locations of 'call' instructions
-        call_idxs = [i
-                     for i, instr in enumerate(self.instructions)
-                     if isinstance(instr, Call)]
-        last_idx = len(self.instructions)-1
-        has_last_call = (last_idx in call_idxs)
-        has_nonlast_call = any(idx != last_idx for idx in call_idxs)
+        has_last_call = False
+        has_non_last_call = False
+        for i, instr in enumerate(self.instructions):
+            if not isinstance(instr, Call):
+                continue
+            if i < len(self.instructions)-1:
+                has_non_last_call = True
+            else:
+                has_last_call = True
 
         if has_last_call:
             # Replace 'call' with 'execute' in final position to save on an
@@ -75,7 +78,7 @@ class Code:
             self.instructions.append(Proceed())
 
         # Clauses with permanent variables or non-last calls need an environment.
-        if perms or has_nonlast_call:
+        if perms or has_non_last_call:
             self.instructions.insert(0, Allocate(len(perms)))
 
             # Deallocate environment before continuing to next clause.
@@ -454,7 +457,7 @@ class ChunkCompiler:
             nested_structs = {} # type: Dict[Struct, Addr]
             for arg in term.args:
                 if isinstance(arg, Struct):
-                    nested_structs[arg] = None
+                    nested_structs[arg] = Register(-1)
 
             self.free_regs.discard(reg)  # Reserve reg for put_struct instruction.
             for struct in nested_structs:
