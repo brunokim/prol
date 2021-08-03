@@ -120,10 +120,10 @@ testdata = [
            call q/4
      """),
     (Clause(Struct('f-eq', Var('X'), Var('Y')),
-        Struct('f', Var('X'), Var('A')),
-        Struct('f', Var('Y'), Var('B')),
-        Struct(r'\==', Var('B'), Struct('p', Atom('a'))),
-        Struct('=', Var('A'), Var('B'))),
+            Struct('f', Var('X'), Var('A')),
+            Struct('f', Var('Y'), Var('B')),
+            Struct(r'\==', Var('B'), Struct('p', Atom('a'))),
+            Struct('=', Var('A'), Var('B'))),
      r"""
         get_var X1, Y0
         put_var X1, Y1
@@ -137,7 +137,7 @@ testdata = [
               = Y1, Y2
      """),
     (Clause(Struct("query"),
-        Struct("length", Var("L"), Struct("s", Struct("s", Struct("s", Atom("0")))))),
+            Struct("length", Var("L"), Struct("s", Struct("s", Struct("s", Atom("0")))))),
      """
         put_var X0, X0
      put_struct X3, s/1

@@ -3,7 +3,7 @@ from typing import List, ClassVar, Any
 
 __all__ = [
     'Term', 'Var', 'Atom', 'Struct', 'Functor', 'Clause',
-    'Addr', 'Register', 'StackAddr', 'AtomAddr', 
+    'Addr', 'Register', 'StackAddr', 'AtomAddr',
     'Instruction', 'Builtin',
     'GetInstr', 'GetValue', 'GetVariable', 'GetAtom', 'GetStruct',
     'PutInstr', 'PutValue', 'PutVariable', 'PutAtom', 'PutStruct',
@@ -273,4 +273,3 @@ class Allocate(Instruction):
 @dataclass(frozen=True)
 class Deallocate(Instruction):
     name = "deallocate"
-

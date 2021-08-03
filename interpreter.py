@@ -17,9 +17,15 @@ class Cell:
 
     def __str__(self):
         return f"@{self.to_term()}"
-    
+
     def __repr__(self):
         return str(self)
+
+
+def to_term(cell: Optional[Cell]) -> Term:
+    if cell is None:
+        return Atom("<nil>")
+    return cell.to_term()
 
 
 @dataclass
@@ -36,7 +42,7 @@ class Ref(Cell):
         if self.value is None:
             return Var(f"_{self.id_}")
         return self.value.to_term()
-    
+
 
 @dataclass
 class AtomCell(Cell):
@@ -67,7 +73,6 @@ class StructCell(Cell):
             arg.to_term() if arg is not None else Atom("<nil>")
             for arg in self.args]
         return Struct(self.name, *args)
-
 
 
 @dataclass
@@ -143,12 +148,12 @@ class Machine:
 
         self.choice: Optional[Choice] = None
         self.state = MachineState(
-            instr_ptr = InstrAddr(query_code.functor),
-            regs = [None for _ in range(num_regs)],
-            top_ref_id = 0,
-            struct_arg = StructArg(StructArgMode.INVALID),
-            continuation = None,
-            env = None,
+            instr_ptr=InstrAddr(query_code.functor),
+            regs=[None for _ in range(num_regs)],
+            top_ref_id=0,
+            struct_arg=StructArg(StructArgMode.INVALID),
+            continuation=None,
+            env=None,
         )
 
     def instr(self) -> Instruction:
@@ -174,7 +179,6 @@ class Machine:
         try:
             if isinstance(instr, Halt):
                 if self.state.env is not None:
-                    to_term = lambda cell: cell.to_term() if cell is not None else Atom("<nil>")
                     yield {x: to_term(cell) for x, cell in zip(self.query_vars, self.state.env.slots)}
                 self.backtrack()
             elif isinstance(instr, (Call, Execute)):
@@ -185,7 +189,7 @@ class Machine:
 
                 if len(self.index[instr.functor]) > 1:
                     # More than one clause for predicate requires pushing a
-                    # choice point. 
+                    # choice point.
                     self.choice = Choice(state=deepcopy(self.state), prev=self.choice)
             elif isinstance(instr, Proceed):
                 if self.state.continuation is None:
@@ -194,9 +198,9 @@ class Machine:
                 self.state.continuation = None
             elif isinstance(instr, Allocate):
                 self.state.env = Env(
-                    slots = [None for _ in range(instr.num_perms)],
-                    continuation = self.state.continuation,
-                    prev = self.state.env,
+                    slots=[None for _ in range(instr.num_perms)],
+                    continuation=self.state.continuation,
+                    prev=self.state.env,
                 )
                 self.state.continuation = None
                 self.forward()
@@ -467,16 +471,16 @@ def main():
         # member_(_, E, E).
         # member_([H|T], E, _) :- member_(T, E, H).
         Clause(Struct("member", Var("E"), Struct(".", Var("H"), Var("T"))),
-            Struct("member_", Var("T"), Var("E"), Var("H"))),
+               Struct("member_", Var("T"), Var("E"), Var("H"))),
         Clause(Struct("member_", Var("_"), Var("E"), Var("E"))),
         Clause(Struct("member_", Struct(".", Var("H"), Var("T")), Var("E"), Var("_")),
-            Struct("member_", Var("T"), Var("E"), Var("H"))),
+               Struct("member_", Var("T"), Var("E"), Var("H"))),
 
         # length([], 0).
-        # length([_|T], s(L)) :- length(T, L).  
+        # length([_|T], s(L)) :- length(T, L).
         Clause(Struct("length", Atom("[]"), Atom("0"))),
         Clause(Struct("length", Struct(".", Var("_"), Var("T")), Struct("s", Var("L"))),
-            Struct("length", Var("T"), Var("L"))),
+               Struct("length", Var("T"), Var("L"))),
     ]
 
     # ?- length(L, s(s(s(0)))), member(a, L).

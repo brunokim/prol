@@ -64,7 +64,7 @@ class Code:
             self.instructions.append(Execute(call.functor))
         else:
             # Facts and bodies that don't end with 'call' need a 'proceed' instruction
-            # to trampoline into continuation. 
+            # to trampoline into continuation.
             self.instructions.append(Proceed())
 
         # Clauses with permanent variables or non-last calls need an environment.
@@ -444,7 +444,7 @@ class ChunkCompiler:
             if isinstance(addr, Register):
                 self.free_regs.add(addr)
         elif isinstance(term, Struct):
-            nested_structs = {} # type: Dict[Struct, Addr]
+            nested_structs = {}  # type: Dict[Struct, Addr]
             for arg in term.args:
                 if isinstance(arg, Struct):
                     nested_structs[arg] = Register(-1)
