@@ -181,8 +181,8 @@ class Machine:
                 if self.state.env is not None:
                     yield {x: to_term(cell) for x, cell in zip(self.query_vars, self.state.env.slots)}
                 self.backtrack()
-            elif isinstance(instr, (Call, Execute)):
-                if isinstance(instr, Call):
+            elif isinstance(instr, Call):
+                if not instr.is_last:
                     self.state.continuation = self.state.instr_ptr
                     self.state.continuation.instr += 1
                 self.state.instr_ptr = InstrAddr(instr.functor)

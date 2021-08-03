@@ -30,13 +30,13 @@ class Code:
         for instr in self.instructions:
             # Try to read register from .reg field
             try:
-                regs.add(instr.reg)
+                regs.add(instr.reg)  # pytype: disable=attribute-error
             except AttributeError:
                 pass
 
             # Try to read address from .addr field
             try:
-                addr = instr.addr
+                addr = instr.addr  # pytype: disable=attribute-error
                 if isinstance(addr, Register):
                     regs.add(addr)
                 if isinstance(addr, StackAddr):
@@ -58,10 +58,10 @@ class Code:
                 has_last_call = True
 
         if has_last_call:
-            # Replace 'call' with 'execute' in final position to save on an
+            # Set 'is_last' bit in Call instruction in final position to save on an
             # environment.
             call = self.instructions.pop()
-            self.instructions.append(Execute(call.functor))
+            self.instructions.append(Call(call.functor, is_last=True))
         else:
             # Facts and bodies that don't end with 'call' need a 'proceed' instruction
             # to trampoline into continuation.

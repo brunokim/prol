@@ -8,8 +8,7 @@ __all__ = [
     'GetInstr', 'GetValue', 'GetVariable', 'GetAtom', 'GetStruct',
     'PutInstr', 'PutValue', 'PutVariable', 'PutAtom', 'PutStruct',
     'UnifyInstr', 'UnifyValue', 'UnifyVariable', 'UnifyAtom',
-    'Call', 'Execute', 'Proceed',
-    'Halt', 'Allocate', 'Deallocate',
+    'Call', 'Proceed', 'Halt', 'Allocate', 'Deallocate',
 ]
 
 
@@ -246,12 +245,10 @@ class UnifyAtom(UnifyInstr):
 class Call(Instruction):
     name = "call"
     functor: Functor
+    is_last: bool = False
 
-
-@dataclass(frozen=True)
-class Execute(Instruction):
-    name = "execute"
-    functor: Functor
+    def __str__(self):
+        return f"{self.name} {self.functor}"
 
 
 @dataclass(frozen=True)
