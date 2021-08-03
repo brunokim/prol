@@ -1,6 +1,17 @@
 from dataclasses import dataclass, fields
 from typing import List, ClassVar, Any
 
+__all__ = [
+    'Term', 'Var', 'Atom', 'Struct', 'Functor', 'Clause',
+    'Addr', 'Register', 'StackAddr', 'AtomAddr', 
+    'Instruction', 'Builtin',
+    'GetInstr', 'GetValue', 'GetVariable', 'GetAtom', 'GetStruct',
+    'PutInstr', 'PutValue', 'PutVariable', 'PutAtom', 'PutStruct',
+    'UnifyInstr', 'UnifyValue', 'UnifyVariable', 'UnifyAtom',
+    'Call', 'Execute', 'Proceed',
+    'Halt', 'Allocate', 'Deallocate',
+]
+
 
 def is_var_name(name: str) -> bool:
     return bool(name) and (name[0].isupper() or name[0] == '_')
