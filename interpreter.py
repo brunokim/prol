@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from model import *
 from compiler import ClauseCompiler, PackageCompiler, Code
-from typing import Mapping, List, Optional, Iterator, Tuple
+from typing import Mapping, List, Optional, Iterator, Tuple, Dict
 from copy import copy, deepcopy
 
 
@@ -119,7 +119,24 @@ class Choice:
     prev: Optional["Choice"] = None
 
 
-Solution = Mapping[Var, Term]
+@dataclass
+class Solution(Mapping[Var, Term]):
+    d: Dict[Var, Term]
+
+    def __getitem__(self, key):
+        return self.d[key]
+
+    def __iter__(self):
+        return iter(self.d)
+
+    def __len__(self):
+        return len(self.d)
+
+    def __str__(self):
+        if not self.d:
+            return "true"
+        items = ', '.join(f"{x}: {t}" for x, t in self.d.items())
+        return f"{{{items}}}"
 
 
 def compile_query(query: List[Struct]) -> Tuple[Code, List[Var]]:
@@ -179,7 +196,7 @@ class Machine:
         try:
             if isinstance(instr, Halt):
                 if self.state.env is not None:
-                    yield {x: to_term(cell) for x, cell in zip(self.query_vars, self.state.env.slots)}
+                    yield Solution({x: to_term(cell) for x, cell in zip(self.query_vars, self.state.env.slots)})
                 self.backtrack()
             elif isinstance(instr, Call):
                 if not instr.is_last:
