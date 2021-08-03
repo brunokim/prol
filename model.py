@@ -142,7 +142,7 @@ class AtomAddr(Addr):
         return f"@{self.atom}"
 
 
-@dataclass
+@dataclass(frozen=True)
 class Instruction:
     name: ClassVar[str]
 
@@ -151,7 +151,7 @@ class Instruction:
         return f"{self.name} {args}"
 
 
-@dataclass
+@dataclass(frozen=True)
 class Builtin(Instruction):
     args: List[Any]
 
@@ -161,116 +161,116 @@ class Builtin(Instruction):
         return f"{f} {args}"
 
 
-@dataclass
+@dataclass(frozen=True)
 class GetInstr(Instruction):
     reg: Register
 
 
-@dataclass
+@dataclass(frozen=True)
 class GetValue(GetInstr):
     name = "get_val"
     addr: Addr
 
 
-@dataclass
+@dataclass(frozen=True)
 class GetVariable(GetInstr):
     name = "get_var"
     addr: Addr
 
 
-@dataclass
+@dataclass(frozen=True)
 class GetAtom(GetInstr):
     name = "get_atom"
     atom: Atom
 
 
-@dataclass
+@dataclass(frozen=True)
 class GetStruct(GetInstr):
     name = "get_struct"
     functor: Functor
 
 
-@dataclass
+@dataclass(frozen=True)
 class PutInstr(Instruction):
     reg: Register
 
 
-@dataclass
+@dataclass(frozen=True)
 class PutValue(PutInstr):
     name = "put_val"
     addr: Addr
 
 
-@dataclass
+@dataclass(frozen=True)
 class PutVariable(PutInstr):
     name = "put_var"
     addr: Addr
 
 
-@dataclass
+@dataclass(frozen=True)
 class PutAtom(PutInstr):
     name = "put_atom"
     atom: Atom
 
 
-@dataclass
+@dataclass(frozen=True)
 class PutStruct(PutInstr):
     name = "put_struct"
     functor: Functor
 
 
-@dataclass
+@dataclass(frozen=True)
 class UnifyInstr(Instruction):
     pass
 
 
-@dataclass
+@dataclass(frozen=True)
 class UnifyValue(UnifyInstr):
     name = "unify_val"
     addr: Addr
 
 
-@dataclass
+@dataclass(frozen=True)
 class UnifyVariable(UnifyInstr):
     name = "unify_var"
     addr: Addr
 
 
-@dataclass
+@dataclass(frozen=True)
 class UnifyAtom(UnifyInstr):
     name = "unify_atom"
     atom: Atom
 
 
-@dataclass
+@dataclass(frozen=True)
 class Call(Instruction):
     name = "call"
     functor: Functor
 
 
-@dataclass
+@dataclass(frozen=True)
 class Execute(Instruction):
     name = "execute"
     functor: Functor
 
 
-@dataclass
+@dataclass(frozen=True)
 class Proceed(Instruction):
     name = "proceed"
 
 
-@dataclass
+@dataclass(frozen=True)
 class Halt(Instruction):
     name = "halt"
 
 
-@dataclass
+@dataclass(frozen=True)
 class Allocate(Instruction):
     name = "allocate"
     num_perms: int
 
 
-@dataclass
+@dataclass(frozen=True)
 class Deallocate(Instruction):
     name = "deallocate"
 
