@@ -69,9 +69,7 @@ class StructCell(Cell):
         return StructCell(f.name, [None for _ in range(f.arity)])
 
     def to_term(self) -> Term:
-        args = [
-            arg.to_term() if arg is not None else Atom("<nil>")
-            for arg in self.args]
+        args = [to_term(arg) for arg in self.args]
         return Struct(self.name, *args)
 
 
@@ -231,7 +229,7 @@ class Machine:
                 self.set(instr.addr, self.get_reg(instr.reg))
                 self.forward()
             elif isinstance(instr, GetValue):
-                self.try_unify(self.get_reg(instr.reg), self.get(instr.addr))
+                self.unify(self.get_reg(instr.reg), self.get(instr.addr))
             elif isinstance(instr, GetAtom):
                 self.read_atom(instr.atom, self.get(instr.reg))
             elif isinstance(instr, GetStruct):
@@ -377,7 +375,7 @@ class Machine:
             self.forward()
         elif isinstance(instr, UnifyValue):
             cell = self.get(instr.addr)
-            self.try_unify(cell, arg)
+            self.unify(cell, arg)
         elif isinstance(instr, UnifyAtom):
             self.read_atom(instr.atom, arg)
         else:
@@ -394,7 +392,7 @@ class Machine:
             raise UnifyError(atom, cell)
         self.forward()
 
-    def try_unify(self, c1: Cell, c2: Cell):
+    def unify(self, c1: Cell, c2: Cell):
         stack = [(c1, c2)]
         while stack:
             c1, c2 = stack.pop()
@@ -424,7 +422,7 @@ class Machine:
                     raise UnifyError(f1, f2)
                 for a1, a2 in zip(c1.args, c2.args):
                     if a1 is None or a2 is None:
-                        raise CompilerError(f"Machine.try_unify: uninitialized struct")
+                        raise CompilerError(f"Machine.unify: uninitialized struct")
                     stack.append((a1, a2))
             else:
                 raise CompilerError(f"Machine.unify: unhandled type {type(c1)}")
