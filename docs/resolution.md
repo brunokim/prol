@@ -1,9 +1,9 @@
 # Resolution strategy and unification
 
-1. [About Prolog](docs/about-prolog.md)
-1. [Resolution strategy](docs/resolution.md)
-1. [Warren Abstract Machine](docs/wam.md)
-1. [Stuff left out](docs/references.md)
+1. [About Prolog](about-prolog.md)
+1. [Resolution strategy](resolution.md)
+1. [Warren Abstract Machine](wam.md)
+1. [Stuff left out](references.md)
 
 ## Depth-first resolution
 
