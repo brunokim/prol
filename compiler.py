@@ -58,10 +58,10 @@ class Code:
                 has_last_call = True
 
         if has_last_call:
-            # Set 'is_last' bit in Call instruction in final position to save on an
+            # Replace Call instruction in final position with Execute to save on an
             # environment.
             call = self.instructions.pop()
-            self.instructions.append(Call(call.functor, is_last=True))
+            self.instructions.append(Execute(call.functor))
         else:
             # Facts and bodies that don't end with 'call' need a 'proceed' instruction
             # to trampoline into continuation.

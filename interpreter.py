@@ -197,15 +197,11 @@ class Machine:
                     yield Solution({x: to_term(cell) for x, cell in zip(self.query_vars, self.state.env.slots)})
                 self.backtrack()
             elif isinstance(instr, Call):
-                if not instr.is_last:
-                    self.state.continuation = self.state.instr_ptr
-                    self.state.continuation.instr += 1
-                self.state.instr_ptr = InstrAddr(instr.functor)
-
-                if len(self.index[instr.functor]) > 1:
-                    # More than one clause for predicate requires pushing a
-                    # choice point.
-                    self.choice = Choice(state=deepcopy(self.state), prev=self.choice)
+                self.state.continuation = self.state.instr_ptr
+                self.state.continuation.instr += 1
+                self.trampoline(instr.functor)
+            elif isinstance(instr, Execute):
+                self.trampoline(instr.functor)
             elif isinstance(instr, Proceed):
                 if self.state.continuation is None:
                     raise CompilerError(f"proceed called without continuation")
@@ -290,6 +286,14 @@ class Machine:
             # Last clause in predicate, pop last choice point for previous one.
             self.choice = self.choice.prev
 
+    def trampoline(self, functor: Functor):
+        self.state.instr_ptr = InstrAddr(functor)
+
+        if len(self.index[functor]) > 1:
+            # More than one clause for predicate requires pushing a
+            # choice point.
+            self.choice = Choice(state=deepcopy(self.state), prev=self.choice)
+ 
     def new_ref(self) -> Ref:
         self.state.top_ref_id += 1
         return Ref(self.state.top_ref_id)
