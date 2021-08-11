@@ -1,5 +1,12 @@
 # Resolution strategy and unification
 
+1. [About Prolog](docs/about-prolog.md)
+1. [Resolution strategy](docs/resolution.md)
+1. [Warren Abstract Machine](docs/wam.md)
+1. [Stuff left out](docs/references.md)
+
+## Depth-first resolution
+
 The Prolog query resolution strategy is not executed in parallel like shown above,
 but in depth.
 When a predicate with multiple clauses match the current term, we push a _choice point_
@@ -21,6 +28,8 @@ We may reach an unsatisfiable state, where the current bindings lead to a logic 
 such as no facts matching the present term.
 In this case, on backtrack, we undo all bindings that were created since the choice point,
 really restoring to the same state.
+
+## Unification
 
 We've said that we expect terms to "match", but weren't precise there. 
 This "matching" is called _unification_, and consists in a very 

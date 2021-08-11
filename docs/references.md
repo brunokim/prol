@@ -1,5 +1,12 @@
 # Stuff left out (or: further reading)
 
+1. [About Prolog](docs/about-prolog.md)
+1. [Resolution strategy](docs/resolution.md)
+1. [Warren Abstract Machine](docs/wam.md)
+1. [Stuff left out](docs/references.md)
+
+## Removed WAM instructions
+
 Not only a Python implementation glosses over memory handling, which is fundamental for a
 low-level implementation, we've also removed some other instruction sets that can be
 ignored or implemented in runtime.
@@ -21,7 +28,8 @@ them using a linked list created with `try`/`retry`/`trust` instructions.
 
 ## Epilog
 
-I hope this repository is a nice study resource for all 4 of those interested in compilersand logic languages. Some known drawbacks:
+I hope this repository is a nice study resource for all 4 of those interested in compilers
+and logic languages. Some known drawbacks:
 
 - Register allocation doesn't know when a variable is no longer used; sometimes it's safe to overwrite it, but currently it first stashes the variable in a safe register;
 - Struct compiling, for both "get" and "put" instructions, seems more complex than necessary;

@@ -1,5 +1,12 @@
 # Warren Abstract Machine
 
+1. [About Prolog](docs/about-prolog.md)
+1. [Resolution strategy](docs/resolution.md)
+1. [Warren Abstract Machine](docs/wam.md)
+1. [Stuff left out](docs/references.md)
+
+## Rationale
+
 For efficient execution of Prolog programs, it's necessary to compile it into a lower
 level architecture.
 David S. Warren proposed in 1983 a set of abstract instructions to be executed by an
@@ -31,7 +38,8 @@ pred(X, Y, Z) :-
   g(Z, r(s(1, 2), s(3, 4))).
 ```
 
-is translated to the following instructions:
+is translated to the following instructions (`@X` means "address of X", which needs to be
+spelled out in the actual instructions):
 
 ```text
 % Get arguments passed in registers X0-X2

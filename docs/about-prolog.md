@@ -1,5 +1,12 @@
 # About Prolog
 
+1. [About Prolog](docs/about-prolog.md)
+1. [Resolution strategy](docs/resolution.md)
+1. [Warren Abstract Machine](docs/wam.md)
+1. [Stuff left out](docs/references.md)
+
+## Prolog primer
+
 Prolog is a declarative, logic programming language that is very useful for solving constraint and combinatorial problems. Prolog programs are structured as a sequence of logic rules and facts over terms. Terms may be either
 
 - an _atom_, which is a constant or symbol, like `1`, `a`, `x_123`. In this implementation, we don't have ints.
