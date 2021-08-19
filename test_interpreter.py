@@ -16,21 +16,44 @@ package = [
     Clause(Struct("length", Atom("[]"), Atom("0"))),
     Clause(Struct("length", Struct(".", Var("_"), Var("T")), Struct("s", Var("L"))),
            Struct("length", Var("T"), Var("L"))),
+
+    # nat(0).
+    # nat(s(X)) :- nat(X).
+    Clause(Struct("nat", Atom("0"))),
+    Clause(Struct("nat", Struct("s", Var("X"))),
+           Struct("nat", Var("X"))),
 ]
 
 testdata = [
     ([
         # ?- length(L, s(s(s(0)))), member(a, L).
-        Struct("length", Var("L"), Struct(
-            "s", Struct("s", Struct("s", Atom("0"))))),
+        Struct("length", Var("L"), Struct("s", Struct("s", Struct("s", Atom("0"))))),
         Struct("member", Atom("a"), Var("L")),
     ], [
-        Solution({Var("L"): Struct(".", Atom("a"), Struct(
-            ".", Var("_"), Struct(".", Var("_"), Atom("[]"))))}),
-        Solution({Var("L"): Struct(".", Var("_"), Struct(
-            ".", Atom("a"), Struct(".", Var("_"), Atom("[]"))))}),
-        Solution({Var("L"): Struct(".", Var("_"), Struct(
-            ".", Var("_"), Struct(".", Atom("a"), Atom("[]"))))}),
+        Solution({Var("L"): Struct(".", Atom("a"), Struct(".", Var("_"), Struct(".", Var("_"), Atom("[]"))))}),
+        Solution({Var("L"): Struct(".", Var("_"), Struct(".", Atom("a"), Struct(".", Var("_"), Atom("[]"))))}),
+        Solution({Var("L"): Struct(".", Var("_"), Struct(".", Var("_"), Struct(".", Atom("a"), Atom("[]"))))}),
+    ]),
+    ([
+        # ?- nat(X).
+        Struct("nat", Var("X")),
+    ], [
+        Solution({Var("X"): Atom("0")}),
+        Solution({Var("X"): Struct("s", Atom("0"))}),
+        Solution({Var("X"): Struct("s", Struct("s", Atom("0")))}),
+        Solution({Var("X"): Struct("s", Struct("s", Struct("s", Atom("0"))))}),
+    ]),
+    ([
+        # ?- member(f(X), [a, f(b), g(c), f(d)]).
+        Struct("member", Struct("f", Var("X")),
+               Struct(".", Atom("a"),
+                      Struct(".", Struct("f", Atom("b")),
+                             Struct(".", Struct("g", Atom("c")),
+                                    Struct(".", Struct("f", Atom("d")),
+                                           Atom("[]")))))),
+    ], [
+        Solution({Var("X"): Atom("b")}),
+        Solution({Var("X"): Atom("d")}),
     ]),
 ]
 
