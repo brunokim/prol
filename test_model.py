@@ -1,6 +1,7 @@
 import pytest
 from model import *
 
+
 @pytest.mark.parametrize("terms, expected", [
     ([], Atom("[]")),
     ([Atom("a")], Struct(".", Atom("a"), Atom("[]"))),

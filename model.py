@@ -99,7 +99,7 @@ class Struct(Term):
         return f"Struct({self.name!r}, {args})"
 
 
-def to_list(terms: List[Term], tail: Term=Atom("[]")) -> Term:
+def to_list(terms: List[Term], tail: Term = Atom("[]")) -> Term:
     l = tail
     for term in terms[::-1]:
         l = Struct(".", term, l)

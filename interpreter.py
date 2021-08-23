@@ -293,7 +293,7 @@ class Machine:
             # More than one clause for predicate requires pushing a
             # choice point.
             self.choice = Choice(state=deepcopy(self.state), prev=self.choice)
- 
+
     def new_ref(self) -> Ref:
         self.state.top_ref_id += 1
         return Ref(self.state.top_ref_id)
