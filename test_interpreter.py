@@ -30,9 +30,9 @@ testdata = [
         Struct("length", Var("L"), Struct("s", Struct("s", Struct("s", Atom("0"))))),
         Struct("member", Atom("a"), Var("L")),
     ], [
-        Solution({Var("L"): Struct(".", Atom("a"), Struct(".", Var("_"), Struct(".", Var("_"), Atom("[]"))))}),
-        Solution({Var("L"): Struct(".", Var("_"), Struct(".", Atom("a"), Struct(".", Var("_"), Atom("[]"))))}),
-        Solution({Var("L"): Struct(".", Var("_"), Struct(".", Var("_"), Struct(".", Atom("a"), Atom("[]"))))}),
+        Solution({Var("L"): to_list([Atom("a"), Var("_"), Var("_")])}),
+        Solution({Var("L"): to_list([Var("_"), Atom("a"), Var("_")])}),
+        Solution({Var("L"): to_list([Var("_"), Var("_"), Atom("a")])}),
     ]),
     ([
         # ?- nat(X).
@@ -45,12 +45,12 @@ testdata = [
     ]),
     ([
         # ?- member(f(X), [a, f(b), g(c), f(d)]).
-        Struct("member", Struct("f", Var("X")),
-               Struct(".", Atom("a"),
-                      Struct(".", Struct("f", Atom("b")),
-                             Struct(".", Struct("g", Atom("c")),
-                                    Struct(".", Struct("f", Atom("d")),
-                                           Atom("[]")))))),
+        Struct("member", Struct("f", Var("X")), to_list([
+            Atom("a"),
+            Struct("f", Atom("b")),
+            Struct("g", Atom("c")),
+            Struct("f", Atom("d")),
+        ])),
     ], [
         Solution({Var("X"): Atom("b")}),
         Solution({Var("X"): Atom("d")}),

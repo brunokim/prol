@@ -1,5 +1,5 @@
 from dataclasses import dataclass, fields
-from typing import List, ClassVar, Any
+from typing import List, ClassVar, Any, Tuple
 
 __all__ = [
     'Term', 'Var', 'Atom', 'Struct', 'Functor', 'Clause',
@@ -9,6 +9,7 @@ __all__ = [
     'PutInstr', 'PutValue', 'PutVariable', 'PutAtom', 'PutStruct',
     'UnifyInstr', 'UnifyValue', 'UnifyVariable', 'UnifyAtom',
     'Call', 'Execute', 'Proceed', 'Halt', 'Allocate', 'Deallocate',
+    'to_list', 'from_list',
 ]
 
 
@@ -96,6 +97,22 @@ class Struct(Term):
             return f"Struct({self.name!r})"
         args = ", ".join(repr(arg) for arg in self.args)
         return f"Struct({self.name!r}, {args})"
+
+
+def to_list(terms: List[Term], tail: Term=Atom("[]")) -> Term:
+    l = tail
+    for term in terms[::-1]:
+        l = Struct(".", term, l)
+    return l
+
+
+def from_list(l: Term) -> Tuple[List[Term], Term]:
+    terms: List[Term] = []
+    while isinstance(l, Struct) and l.functor() == Functor(".", 2):
+        head, tail = l.args
+        terms.append(head)
+        l = tail
+    return terms, l
 
 
 class Clause:
