@@ -151,18 +151,20 @@ rules = [
         s("digits", "L", "T0", "T1")),
     Clause(s("digits", "[]", "T", "T")),
 
+    # atom(atom(L))      --> [''''], quoted(L).
     # atom(atom([Ch|L])) --> [Ch], {lower(Ch)}, idents(L).
-    # atom(atom(L)) --> [''''], quoted(L).
-    # atom(atom(L)) --> symbols(L).
-    # atom(atom(L)) --> digits(L).
+    # atom(atom([Ch|L])) --> [Ch], {symbol(L)}, symbols(L).
+    # atom(atom([Ch|L])) --> [Ch], {digit(L)}, digits(L).
+    Clause(s("atom", s("atom", "L"), cons("'", "T0"), "T1"),
+        s("quoted", "L", "T0", "T1")),
     Clause(s("atom", s("atom", cons("Ch", "L")), cons("Ch", "T0"), "T1"),
         s("lower", "Ch"),
         s("idents", "L", "T0", "T1")),
-    Clause(s("atom", s("atom", "L"), cons("'", "T0"), "T1"),
-        s("quoted", "L", "T0", "T1")),
-    Clause(s("atom", s("atom", "L"), "T0", "T1"),
+    Clause(s("atom", s("atom", cons("Ch", "L")), cons("Ch", "T0"), "T1"),
+        s("symbol", "Ch"),
         s("symbols", "L", "T0", "T1")),
-    Clause(s("atom", s("atom", "L"), "T0", "T1"),
+    Clause(s("atom", s("atom", cons("Ch", "L")), cons("Ch", "T0"), "T1"),
+        s("digit", "Ch"),
         s("digits", "L", "T0", "T1")),
 
     # quoted([Ch|L])   --> [Ch], {Ch \== ''''}, quoted(L).
