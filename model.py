@@ -19,13 +19,13 @@ def is_var_name(name: str) -> bool:
 
 
 def atom_needs_escape(name: str) -> bool:
-    SYNTACTIC = "()'"
+    LEXICAL = "()',"
     SPACE = r" \n\t"
     SYMBOLS = r"\\=[\].:!@#$%&*+{}^~?/<>-"
 
     if is_var_name(name):
         return True
-    if re.search(f'[{SYNTACTIC}{SPACE}]', name):
+    if re.search(f'[{LEXICAL}{SPACE}]', name):
         return True
     if re.match(r'\d.*\D', name):
         return True
