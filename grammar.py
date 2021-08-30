@@ -128,7 +128,7 @@ rules = [
     Clause(s("ident", "Ch"), s("lower", "Ch")),
     Clause(s("ident", "Ch"), s("upper", "Ch")),
     Clause(s("ident", "Ch"), s("digit", "Ch")),
-    Clause(s("ident", "_")),
+    Clause(s("ident", Atom("_"))),
 
     # idents([Ch|L]) --> [Ch], {ident(Ch)}, idents(L).
     # idents([]) --> [].
@@ -152,38 +152,38 @@ rules = [
     Clause(s("digits", "[]", "T", "T")),
 
     # atom(atom([Ch|L])) --> [Ch], {lower(Ch)}, idents(L).
-    # atom(atom([''''|L])) --> [''''], quoted(L).
+    # atom(atom(L)) --> [''''], quoted(L).
     # atom(atom(L)) --> symbols(L).
     # atom(atom(L)) --> digits(L).
     Clause(s("atom", s("atom", cons("Ch", "L")), cons("Ch", "T0"), "T1"),
         s("lower", "Ch"),
         s("idents", "L", "T0", "T1")),
-    Clause(s("atom", s("atom", cons("'", "L")), cons("'", "T0"), "T1"),
+    Clause(s("atom", s("atom", "L"), cons("'", "T0"), "T1"),
         s("quoted", "L", "T0", "T1")),
     Clause(s("atom", s("atom", "L"), "T0", "T1"),
         s("symbols", "L", "T0", "T1")),
     Clause(s("atom", s("atom", "L"), "T0", "T1"),
         s("digits", "L", "T0", "T1")),
 
-    # quoted([Ch|L]) --> [Ch], {Ch \== ''''}, quoted(L).
+    # quoted([Ch|L])   --> [Ch], {Ch \== ''''}, quoted(L).
     # quoted([''''|L]) --> ['''', ''''], quoted(L).
-    # quoted(['''']) --> ['''', Ch], {Ch \== ''''}.
-    # quoted(['''']) --> [].
+    # quoted([]), [Ch] --> ['''', Ch], {Ch \== ''''}.
+    # quoted([])       --> [''''].
     Clause(s("quoted", cons("Ch", "L"), cons("Ch", "T0"), "T1"),
         s(r"\==", "Ch", "'"),
         s("quoted", "L", "T0", "T1")),
     Clause(s("quoted", cons("'", "L"), cons("'", cons("'", "T0")), "T1"),
         s("quoted", "L", "T0", "T1")),
-    Clause(s("quoted", cons("'", "[]"), cons("'", cons("Ch", "T")), "T"),
+    Clause(s("quoted", "[]", cons("'", cons("Ch", "T")), cons("Ch", "T")),
         s(r"\==", "Ch", "'")),
-    Clause(s("quoted", cons("'", "[]"), cons("'", "[]"), "[]")),
+    Clause(s("quoted", "[]", cons("'", "[]"), "[]")),
 
     # var(var([Ch|L])) --> [Ch], {upper(Ch)}, idents(L).
     # var(var(['_'|L])) --> ['_'], idents(L).
     Clause(s("var", s("var", cons("Ch", "L")), cons("Ch", "T0"), "T1"),
         s("upper", "Ch"),
         s("idents", "L", "T0", "T1")),
-    Clause(s("var", s("var", cons("_", "L")), cons("_", "T0"), "T1"),
+    Clause(s("var", s("var", cons(Atom("_"), "L")), cons(Atom("_"), "T0"), "T1"),
         s("idents", "L", "T0", "T1")),
 
     # struct(struct(Name, Args)) --> atom(atom(Name)), ['('], ws, terms(Args), ws, [')'].
