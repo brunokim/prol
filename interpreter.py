@@ -4,16 +4,47 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from model import *
 from compiler import ClauseCompiler, PackageCompiler, Code
+from functools import total_ordering
 from typing import Mapping, List, Optional, Iterator, Tuple, Dict
 from copy import copy, deepcopy
+from enum import Enum, auto
 
 
+class Ordering(Enum):
+    LT = auto()
+    EQ = auto()
+    GT = auto()
+
+    @staticmethod
+    def compare(x, y) -> "Ordering":
+        if x < y:
+            return Ordering.LT
+        if x > y:
+            return Ordering.GT
+        return Ordering.EQ
+
+
+@total_ordering
 class Cell:
     def deref(self):
         return self
 
+    @classmethod
+    def order(cls) -> int:
+        raise NotImplementedError("{cls}.order")
+
     def to_term(self) -> Term:
         raise NotImplementedError("{type(self)}.to_term")
+
+    def compare(self, other) -> Ordering:
+        raise NotImplementedError("{type(self)}.compare")
+
+    def __lt__(self, other: "Cell") -> bool:
+        if self.order() < other.order():
+            return True
+        if self.order() > other.order():
+            return False
+        return self.compare(other) == Ordering.LT
 
     def __str__(self):
         return f"@{self.to_term()}"
@@ -33,6 +64,10 @@ class Ref(Cell):
     id_: int
     value: Optional[Cell] = None
 
+    @classmethod
+    def order(cls):
+        return 10
+
     def deref(self):
         if self.value is None:
             return self
@@ -43,19 +78,33 @@ class Ref(Cell):
             return Var(f"_{self.id_}")
         return self.value.to_term()
 
+    def compare(self, other: "Ref") -> Ordering:
+        return Ordering.compare(self.id_, other.id_)
+
 
 @dataclass
 class AtomCell(Cell):
     value: Atom
 
+    @classmethod
+    def order(cls):
+        return 20
+
     def to_term(self) -> Term:
         return self.value
+
+    def compare(self, other: "AtomCell") -> Ordering:
+        return Ordering.compare(self.value.name, other.value.name)
 
 
 @dataclass
 class StructCell(Cell):
     name: str
     args: List[Optional[Cell]]
+
+    @classmethod
+    def order(cls):
+        return 30
 
     @property
     def arity(self) -> int:
@@ -71,6 +120,17 @@ class StructCell(Cell):
     def to_term(self) -> Term:
         args = [to_term(arg) for arg in self.args]
         return Struct(self.name, *args)
+
+    def compare(self, other: "StructCell") -> Ordering:
+        pairs = [(self.arity, other.arity), (self.name, other.name)]
+        pairs += zip(self.args, other.args)
+        for t1, t2 in pairs:
+            if t1 is None or t2 is None:
+                raise CompilerError(f"comparing incomplete struct: {self}, {other}")
+            order = Ordering.compare(t1, t2)
+            if order != Ordering.EQ:
+                return order
+        return Ordering.EQ
 
 
 @dataclass
@@ -208,6 +268,51 @@ class Machine:
         slots = ' '.join(f'{slot!s:<10}' for slot in self.state.env.slots) if self.state.env else ''
         print(f"{mark}{'  '*num_envs}{instr:<{40-num_envs*2}} {regs} | {slots}")
 
+    def builtin_eq(self, a1: Addr, a2: Addr):
+        self.unify(self.get(a1), self.get(a2))
+
+    def builtin_lt(self, a1: Addr, a2: Addr):
+        c1, c2 = self.get(a1).deref(), self.get(a2).deref()
+        if c1 < c2:
+            self.forward()
+        else:
+            self.backtrack()
+
+    def builtin_gt(self, a1: Addr, a2: Addr):
+        c1, c2 = self.get(a1).deref(), self.get(a2).deref()
+        if c1 > c2:
+            self.forward()
+        else:
+            self.backtrack()
+
+    def builtin_le(self, a1: Addr, a2: Addr):
+        c1, c2 = self.get(a1).deref(), self.get(a2).deref()
+        if c1 <= c2:
+            self.forward()
+        else:
+            self.backtrack()
+
+    def builtin_ge(self, a1: Addr, a2: Addr):
+        c1, c2 = self.get(a1).deref(), self.get(a2).deref()
+        if c1 >= c2:
+            self.forward()
+        else:
+            self.backtrack()
+
+    def builtin_equivalent(self, a1: Addr, a2: Addr):
+        c1, c2 = self.get(a1).deref(), self.get(a2).deref()
+        if c1 == c2:
+            self.forward()
+        else:
+            self.backtrack()
+
+    def builtin_not_equivalent(self, a1: Addr, a2: Addr):
+        c1, c2 = self.get(a1).deref(), self.get(a2).deref()
+        if c1 != c2:
+            self.forward()
+        else:
+            self.backtrack()
+
     def run_instr(self, instr: Instruction) -> Iterator[Solution]:
         try:
             self.has_backtracked = False
@@ -215,6 +320,20 @@ class Machine:
                 if self.state.env is not None:
                     yield Solution({x: to_term(cell) for x, cell in zip(self.query_vars, self.state.env.slots)})
                 self.backtrack()
+            elif isinstance(instr, Builtin):
+                name, *addrs = instr.args
+                builtin_fn = {
+                    '=': self.builtin_eq,
+                    '<': self.builtin_lt,
+                    '>': self.builtin_gt,
+                    '=<': self.builtin_le,
+                    '>=': self.builtin_ge,
+                    '==': self.builtin_equivalent,
+                    r'\==': self.builtin_not_equivalent,
+                }.get(name)
+                if builtin_fn is None:
+                    self.backtrack()
+                builtin_fn(*addrs)
             elif isinstance(instr, Call):
                 self.state.continuation = self.state.instr_ptr
                 self.state.continuation.instr += 1
