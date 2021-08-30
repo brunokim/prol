@@ -1,5 +1,6 @@
 from dataclasses import dataclass, fields
 from typing import List, ClassVar, Any, Tuple
+import re
 
 __all__ = [
     'Term', 'Var', 'Atom', 'Struct', 'Functor', 'Clause',
@@ -15,6 +16,22 @@ __all__ = [
 
 def is_var_name(name: str) -> bool:
     return bool(name) and (name[0].isupper() or name[0] == '_')
+
+
+def atom_needs_escape(name: str) -> bool:
+    SYNTACTIC = "()'"
+    SPACE = r" \n\t"
+    SYMBOLS = r"\\=[\].:!@#$%&*+{}^~?/<>-"
+
+    if is_var_name(name):
+        return True
+    if re.search(f'[{SYNTACTIC}{SPACE}]', name):
+        return True
+    if re.match(r'\d.*\D', name):
+        return True
+    if re.match(f'[{SYMBOLS}].*[^{SYMBOLS}]', name):
+        return True
+    return False
 
 
 class Term:
@@ -42,11 +59,11 @@ class Var(Term):
 
 class Atom(Term):
     def __init__(self, name: str):
-        if is_var_name(name):
-            raise ValueError(f"Invalid atom name: {name}")
         self.name = name
 
     def __str__(self):
+        if atom_needs_escape(self.name):
+            return "'" + self.name.replace("'", "''") + "'"
         return self.name
 
     def __hash__(self):

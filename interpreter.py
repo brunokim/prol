@@ -154,7 +154,8 @@ class Machine:
         query_code, query_vars = compile_query(query)
         self.index[query_code.functor] = [query_code]
         self.query_vars = query_vars
-        self.max_iter = 100
+        self.max_iter = 10000
+        self.has_backtracked = False
 
         num_regs = 0
         for codes in self.index.values():
@@ -177,10 +178,19 @@ class Machine:
         code = predicate[ptr.order]
         return code.instructions[ptr.instr]
 
+    def envs(self) -> List[Env]:
+        env = self.state.env
+        envs = []
+        while env is not None:
+            envs.append(env)
+            env = env.prev
+        return envs
+
     def run(self) -> Iterator[Solution]:
         iterations = 0
         try:
             while iterations < self.max_iter:
+                # self.debug_state()
                 yield from self.run_instr(self.instr())
                 iterations += 1
         except NoMoreChoices:
@@ -190,8 +200,17 @@ class Machine:
             traceback.print_tb(e.__traceback__)
             print(e)
 
+    def debug_state(self):
+        mark = '*' if self.has_backtracked else ' '
+        num_envs = len(self.envs())
+        instr = str(self.instr())
+        regs = ' '.join(f'{reg!s:<10}' for reg in self.state.regs)
+        slots = ' '.join(f'{slot!s:<10}' for slot in self.state.env.slots) if self.state.env else ''
+        print(f"{mark}{'  '*num_envs}{instr:<{40-num_envs*2}} {regs} | {slots}")
+
     def run_instr(self, instr: Instruction) -> Iterator[Solution]:
         try:
+            self.has_backtracked = False
             if isinstance(instr, Halt):
                 if self.state.env is not None:
                     yield Solution({x: to_term(cell) for x, cell in zip(self.query_vars, self.state.env.slots)})
@@ -263,6 +282,7 @@ class Machine:
                 raise NotImplementedError(f"Machine.run: not implemented for instr type {type(instr)}")
         except UnifyError as e:
             self.backtrack()
+            self.has_backtracked = True
 
     def forward(self):
         ptr = self.state.instr_ptr
@@ -282,6 +302,7 @@ class Machine:
         next_ptr = InstrAddr(ptr.functor, ptr.order+1)
         self.state = deepcopy(self.choice.state)
         self.state.instr_ptr = next_ptr
+        self.choice.state.instr_ptr.order += 1
         if len(self.index[ptr.functor])-1 == next_ptr.order:
             # Last clause in predicate, pop last choice point for previous one.
             self.choice = self.choice.prev

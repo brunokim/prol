@@ -44,7 +44,8 @@ class Code:
             except AttributeError:
                 pass
 
-        self.num_regs = max(reg.index for reg in regs) + 1
+        reg_indices = [reg.index for reg in regs] or [-1]
+        self.num_regs = max(reg_indices) + 1
 
         # Check locations of 'call' instructions
         has_last_call = False
@@ -86,7 +87,8 @@ class PackageCompiler:
         for clause in self.clauses:
             functor = clause.head.functor()
             compiler = ClauseCompiler(clause)
-            code = Code(functor, list(compiler.compile()))
+            instructions = list(compiler.compile())
+            code = Code(functor, instructions)
             m[functor].append(code)
         return m
 
@@ -396,7 +398,7 @@ class ChunkCompiler:
             for arg in term.args:
                 yield from self.unify_arg(arg)
         else:
-            raise NotImplementedError(f"get_term: unhandled term type {type(term)}")
+            raise NotImplementedError(f"get_term: unhandled term type {type(term)}: {term}")
 
     def unify_arg(self, term: Term) -> Iterator[Instruction]:
         """Issue unify instruction for struct arg."""
