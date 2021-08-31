@@ -333,7 +333,8 @@ class Machine:
                 }.get(name)
                 if builtin_fn is None:
                     self.backtrack()
-                builtin_fn(*addrs)
+                else:
+                    builtin_fn(*addrs)
             elif isinstance(instr, Call):
                 self.state.continuation = self.state.instr_ptr
                 self.state.continuation.instr += 1
