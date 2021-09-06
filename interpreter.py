@@ -408,9 +408,8 @@ class Machine:
         ptr = self.state.instr_ptr
         code = self.index[ptr.functor][ptr.order]
         if ptr.instr == len(code.instructions)-1:
-            # End of code, return to continuation
-            ptr = self.state.continuation
-            self.state.continuation = None
+            # End of code without proceed
+            raise CompilerError(f"reached end-of-function without proceed instruction at {ptr}")
         ptr.instr += 1
         self.state.instr_ptr = ptr
 
