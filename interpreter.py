@@ -10,6 +10,12 @@ from copy import copy, deepcopy
 from enum import Enum, auto
 
 
+__all__ = [
+    'Cell', 'Ref', 'AtomCell', 'StructCell',
+    'Machine', 'Solution',
+]
+
+
 class Ordering(Enum):
     LT = auto()
     EQ = auto()

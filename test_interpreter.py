@@ -1,4 +1,5 @@
 import pytest
+from model import *
 from interpreter import *
 
 package = [
