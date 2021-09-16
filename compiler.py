@@ -95,11 +95,13 @@ class PackageCompiler:
 
 def term_vars(term: Term) -> Iterator[Var]:
     """Yield all vars within term, in depth-first order and with repetition."""
-    if isinstance(term, Var):
-        yield term
-    if isinstance(term, Struct):
-        for arg in term.args:
-            yield from term_vars(arg)
+    terms = [term]
+    while terms:
+        term = terms.pop(0)
+        if isinstance(term, Var):
+            yield term
+        if isinstance(term, Struct):
+            terms = list(term.args) + terms
 
 
 class Chunk:
@@ -180,18 +182,20 @@ def count_nested_structs(chunk: Chunk) -> int:
     ...
     3
     """
+    def count_structs(term: Term) -> int:
+        terms = [term]
+        n = 0
+        while terms:
+            term = terms.pop(0)
+            if isinstance(term, Struct):
+                n += 1
+                terms = list(term.args) + terms
+        return n
+
     n = 0
-
-    def count_structs(term: Term):
-        nonlocal n
-        if isinstance(term, Struct):
-            n += 1
-            for arg in term.args:
-                count_structs(arg)
-
     for term in chunk.terms:
         for arg in term.args:
-            count_structs(arg)
+            n += count_structs(arg)
     return n
 
 

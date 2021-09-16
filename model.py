@@ -91,6 +91,7 @@ class Struct(Term):
             raise ValueError(f"Invalid struct name: {name}")
         self.name = name
         self.args = args
+        self._hash = hash((name, args))
 
     @property
     def arity(self) -> int:
@@ -104,7 +105,7 @@ class Struct(Term):
         return f"{self.name}({args})"
 
     def __hash__(self):
-        return hash((self.name, self.args))
+        return self._hash
 
     def __eq__(self, other):
         return isinstance(other, Struct) and self.name == other.name and self.args == other.args
