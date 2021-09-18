@@ -14,9 +14,10 @@ Symposium of Logic Programming, 1986
 from collections import defaultdict
 from enum import Enum, auto
 from model import *
-from typing import cast, Sequence, Dict, Iterator, Tuple, Set, List, Union, MutableMapping
+from typing import cast, Sequence, Dict, Iterator, Tuple, Set, List, Union, MutableMapping, Optional, Mapping, Iterable
 from operator import attrgetter
 from dataclasses import dataclass, field
+import itertools as it
 
 
 @dataclass
@@ -78,19 +79,59 @@ class Code:
             self.instructions.append(last_instr)
 
 
+@dataclass
+class Index:
+    is_var: bool
+    by_var: List[Code]
+    by_atom: Mapping[Atom, List[Code]]
+    by_struct: Mapping[Functor, List[Code]]
+
+
+def compile_code(functor: Functor, clause: Clause) -> Code:
+    instructions = list(ClauseCompiler(clause).compile())
+    return Code(functor, instructions)
+
+
+def index_clauses(clauses: Iterable[Clause]) -> MutableMapping[Functor, List[Index]]:
+    by_functor = defaultdict(list)
+    for clause in clauses:
+        functor = clause.head.functor()
+        by_functor[functor].append(clause)
+
+    indices: Dict[Functor, List[Index]] = defaultdict(list)
+    for functor, clauses in by_functor.items():
+        if not functor.arity:
+            # 0-arity functions can't be indexed.
+            codes = [compile_code(functor, clause) for clause in clauses]
+            indices[functor] = [Index(True, codes, {}, {})]
+            continue
+
+        def is_first_arg_var(clause):
+            return isinstance(clause.head.args[0], Var)
+        for is_var, clauses in it.groupby(clauses, key=is_first_arg_var):
+            by_var: List[Code] = []
+            by_atom: Dict[Atom, List[Code]] = defaultdict(list)
+            by_struct: Dict[Functor, List[Code]] = defaultdict(list)
+            for clause in clauses:
+                code = compile_code(functor, clause)
+                by_var.append(code)
+
+                first_arg = clause.head.args[0]
+                if isinstance(first_arg, Atom):
+                    by_atom[first_arg].append(code)
+                elif isinstance(first_arg, Struct):
+                    by_struct[first_arg.functor()].append(code)
+            indices[functor].append(Index(is_var, by_var, by_atom, by_struct))
+
+    return indices
+
+
 class PackageCompiler:
     def __init__(self, *clauses: Clause):
         self.clauses = clauses
 
-    def compile(self) -> MutableMapping[Functor, List[Code]]:
-        m = defaultdict(list)  # Dict[Functor, List[Code]]
-        for clause in self.clauses:
-            functor = clause.head.functor()
-            compiler = ClauseCompiler(clause)
-            instructions = list(compiler.compile())
-            code = Code(functor, instructions)
-            m[functor].append(code)
-        return m
+    def compile(self) -> MutableMapping[Functor, List[Index]]:
+        return index_clauses(self.clauses)
 
 
 def term_vars(term: Term) -> Iterator[Var]:

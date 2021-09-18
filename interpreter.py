@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from model import *
-from compiler import ClauseCompiler, PackageCompiler, Code
+from compiler import ClauseCompiler, PackageCompiler, Code, Index
 from functools import total_ordering
 from typing import Mapping, List, Optional, Iterator, Tuple, Dict
 from copy import copy, deepcopy
@@ -61,7 +61,7 @@ class Cell:
 
 def to_term(cell: Optional[Cell]) -> Term:
     if cell is None:
-        return Atom("<nil>")
+        return Atom("")
     return cell.to_term()
 
 
@@ -139,9 +139,25 @@ class StructCell(Cell):
         return Ordering.EQ
 
 
+def indexed_codes(indices: List[Index], first_arg: Optional[Cell]) -> List[Code]:
+    codes = []
+    cell = first_arg.deref() if first_arg else None
+    for index in indices:
+        if cell is None or isinstance(cell, Ref) or index.is_var:
+            codes.extend(index.by_var)
+        elif isinstance(cell, AtomCell):
+            codes.extend(index.by_atom[cell.value])
+        elif isinstance(cell, StructCell):
+            codes.extend(index.by_struct[cell.functor()])
+        else:
+            raise CompilerError(f"unhandled cell type {type(cell)} ({cell})")
+    return codes
+
+
 @dataclass
 class InstrAddr:
     functor: Functor
+    codes: List[Code]
     order: int = 0
     instr: int = 0
 
@@ -216,33 +232,28 @@ def compile_query(query: List[Struct]) -> Tuple[Code, List[Var]]:
 
 class Machine:
     def __init__(self, package: List[Clause], query: List[Struct]):
-        self.index = PackageCompiler(*package).compile()
         query_code, query_vars = compile_query(query)
-        self.index[query_code.functor] = [query_code]
+        self.indices_by_functor = PackageCompiler(*package).compile()
+        self.indices_by_functor[query_code.functor] = [Index(True, [query_code], {}, {})]
         self.query_vars = query_vars
         self.max_iter = 10000
         self.has_backtracked = False
 
         num_regs = 0
-        for codes in self.index.values():
-            for code in codes:
-                num_regs = max(num_regs, code.num_regs)
+        for indices in self.indices_by_functor.values():
+            for index in indices:
+                for code in index.by_var:
+                    num_regs = max(num_regs, code.num_regs)
 
         self.choice: Optional[Choice] = None
         self.state = MachineState(
-            instr_ptr=InstrAddr(query_code.functor),
+            instr_ptr=InstrAddr(query_code.functor, [query_code]),
             regs=[None for _ in range(num_regs)],
             top_ref_id=0,
             struct_arg=StructArg(StructArgMode.INVALID),
             continuation=None,
             env=None,
         )
-
-    def instr(self) -> Instruction:
-        ptr = self.state.instr_ptr
-        predicate = self.index[ptr.functor]
-        code = predicate[ptr.order]
-        return code.instructions[ptr.instr]
 
     def envs(self) -> List[Env]:
         env = self.state.env
@@ -410,9 +421,15 @@ class Machine:
             self.backtrack()
             self.has_backtracked = True
 
+    def instr(self) -> Instruction:
+        ptr = self.state.instr_ptr
+        predicate = ptr.codes
+        code = predicate[ptr.order]
+        return code.instructions[ptr.instr]
+
     def forward(self):
         ptr = self.state.instr_ptr
-        code = self.index[ptr.functor][ptr.order]
+        code = ptr.codes[ptr.order]
         if ptr.instr == len(code.instructions)-1:
             # End of code without proceed
             raise CompilerError(f"reached end-of-function without proceed instruction at {ptr}")
@@ -424,20 +441,27 @@ class Machine:
             raise NoMoreChoices()
         self.unwind_trail()
         ptr = self.choice.state.instr_ptr
-        next_ptr = InstrAddr(ptr.functor, ptr.order+1)
+        next_ptr = InstrAddr(ptr.functor, ptr.codes, ptr.order+1)
         self.state = deepcopy(self.choice.state)
         self.state.instr_ptr = next_ptr
         self.choice.state.instr_ptr.order += 1
-        if len(self.index[ptr.functor])-1 == next_ptr.order:
+        if len(self.state.instr_ptr.codes)-1 == next_ptr.order:
             # Last clause in predicate, pop last choice point for previous one.
             self.choice = self.choice.prev
 
     def trampoline(self, functor: Functor):
-        self.state.instr_ptr = InstrAddr(functor)
+        first_arg = None
+        if self.state.regs:
+            first_arg = self.state.regs[0]
+        indices = self.indices_by_functor[functor]
+        codes = indexed_codes(indices, first_arg)
+        if not codes:
+            self.backtrack()
+            return
 
-        if len(self.index[functor]) > 1:
-            # More than one clause for predicate requires pushing a
-            # choice point.
+        self.state.instr_ptr = InstrAddr(functor, codes)
+        if len(codes) > 1:
+            # More than one clause for predicate requires pushing a choice point
             self.choice = Choice(state=deepcopy(self.state), prev=self.choice)
 
     def new_ref(self) -> Ref:
@@ -604,12 +628,15 @@ class Machine:
     def __str__(self):
         s = ""
         sp, nl = "  ", "\n"
-        for functor, preds in self.index.items():
+        for functor, indices in self.indices_by_functor.items():
             s += f"{sp*0}{functor}:{nl}"
-            for i, pred in enumerate(preds):
-                s += f"{sp*1}#{i}:{nl}"
-                for instr in pred.instructions:
-                    s += f"{sp*2}{instr}{nl}"
+            i = 0
+            for index in indices:
+                for code in index.by_var:
+                    s += f"{sp*1}#{i}:{nl}"
+                    for instr in code.instructions:
+                        s += f"{sp*2}{instr}{nl}"
+                    i += 1
         return s[:-1]  # Remove last newline
 
 

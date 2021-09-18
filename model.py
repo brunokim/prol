@@ -23,6 +23,8 @@ def atom_needs_escape(name: str) -> bool:
     SPACE = r" \n\t"
     SYMBOLS = r"\\=[\].:!@#$%&*+{}^~?/<>-"
 
+    if not name:
+        return True
     if is_var_name(name):
         return True
     if re.search(f'[{LEXICAL}{SPACE}]', name):
