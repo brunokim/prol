@@ -1,9 +1,9 @@
 from interpreter import *
 from model import *
 
-from typing import cast, List
+from typing import cast, List, Iterable
 
-__all__ = ['parse_term']
+__all__ = ['parse_term', 'parse_query']
 
 
 def s0(name):
@@ -78,6 +78,25 @@ def parse_term(text: str) -> Term:
     solution = next(m.run())
     encoded_term = solution[Var('Term')]
     return decode_term(encoded_term)
+
+
+def term_to_query(term: Term) -> Struct:
+    if isinstance(term, Var):
+        return s("call", term)
+    if isinstance(term, Atom):
+        return s0(term.name)
+    if isinstance(term, Struct):
+        return term
+    raise ValueError(f"unhandled term type {type(term)} ({term})")
+
+
+def parse_query(text: str) -> List[Struct]:
+    chars = str_to_chars(text)
+    m = Machine(facts + rules, [s("parse_query", chars, "Terms")])
+    solution = next(m.run())
+    encoded_terms = solution[Var('Terms')]
+    terms = decode_terms(encoded_terms)
+    return [term_to_query(term) for term in terms]
 
 
 facts = (
@@ -350,7 +369,7 @@ def main():
 
     machine = Machine(facts + rules, [s("parse_kb", chars, "Clauses")])
     first_solution = next(machine.run())
-    print(first_solution["Clauses"])
+    print(first_solution[Var("Clauses")])
 
 
 if __name__ == '__main__':

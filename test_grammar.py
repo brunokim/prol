@@ -33,3 +33,13 @@ import pytest
 ])
 def test_parse_term(text, term):
     assert parse_term(text) == term
+
+
+@pytest.mark.parametrize('text, query', [
+    ("f().", [Struct("f")]),
+    ("f(X).", [Struct("f", Var("X"))]),
+    ("f(X), a.", [Struct("f", Var("X")), Struct("a")]),
+    (" X, a .", [Struct("call", Var("X")), Struct("a")]),
+])
+def test_parse_query(text, query):
+    assert parse_query(text) == query
