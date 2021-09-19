@@ -201,6 +201,7 @@ class MachineState:
     struct_arg: StructArg
     continuation: Optional[InstrAddr]
     env: Optional["Env"]
+    depth: int
 
     def clone(self) -> "MachineState":
         return MachineState(
@@ -210,6 +211,7 @@ class MachineState:
             self.struct_arg,
             self.continuation,
             self.env.clone() if self.env else None,
+            self.depth,
         )
 
 
@@ -217,12 +219,14 @@ class MachineState:
 class Env:
     slots: List[Optional[Cell]]
     continuation: Optional[InstrAddr]
+    num_executes: int
     prev: Optional["Env"] = None
 
     def clone(self) -> "Env":
         return Env(
             list(self.slots),
             self.continuation,
+            self.num_executes,
             self.prev.clone() if self.prev else None,
         )
 
@@ -288,6 +292,7 @@ class Machine:
             struct_arg=StructArg(StructArgMode.INVALID),
             continuation=None,
             env=None,
+            depth=0,
         )
 
     def envs(self) -> List[Env]:
@@ -318,7 +323,7 @@ class Machine:
         instr = str(self.instr())
         regs = ' '.join(f'{reg!s:<10}' for reg in self.state.regs)
         slots = ' '.join(f'{slot!s:<10}' for slot in self.state.env.slots) if self.state.env else ''
-        print(f"{mark}{'  '*num_envs}{instr:<{40-num_envs*2}} {regs} | {slots}")
+        print(f"{mark} {self.state.depth:04d} {'  '*num_envs}{instr:<{40-num_envs*2}} {regs} | {slots}")
 
     def builtin_eq(self, a1: Addr, a2: Addr):
         self.unify(self.get(a1), self.get(a2))
@@ -388,11 +393,16 @@ class Machine:
                 else:
                     builtin_fn(*addrs)
             elif isinstance(instr, Call):
+                self.state.depth += 1
                 self.state.continuation = self.state.instr_ptr.step()
                 self.trampoline(instr.functor)
             elif isinstance(instr, Execute):
+                self.state.depth += 1
+                self.state.env.num_executes += 1
                 self.trampoline(instr.functor)
             elif isinstance(instr, Proceed):
+                self.state.depth -= self.state.env.num_executes + 1
+                self.state.env.num_executes = 0
                 if self.state.continuation is None:
                     raise CompilerError(f"proceed called without continuation")
                 self.state.instr_ptr = self.state.continuation
@@ -401,6 +411,7 @@ class Machine:
                 self.state.env = Env(
                     slots=[None for _ in range(instr.num_perms)],
                     continuation=self.state.continuation,
+                    num_executes=0,
                     prev=self.state.env,
                 )
                 self.state.continuation = None
