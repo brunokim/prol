@@ -304,7 +304,7 @@ rules = [
 def main():
     grammar = r"""
         parse_term(Chars, Term) :- parse_term(Term, Chars, []).
-        parse_term(Chars, T0, T3) :-
+        parse_term(Term, T0, T3) :-
             ws(T0, T1),
             term(Term, T1, T2),
             ws(T2, T3).
@@ -347,14 +347,16 @@ def main():
             digits(L, T0, T1).
         digits([], T, T).
 
+        atom(atom(L), .('''', T0), T1) :-
+            quoted(L, T0, T1).
         atom(atom(.(Ch, L)), .(Ch, T0), T1) :-
             lower(Ch),
             idents(L, T0, T1).
-        atom(atom(.('''', L)), .('''', T0), T1) :-
-            quoted(L, T0, T1).
-        atom(atom(L), T0, T1) :-
+        atom(atom(.(Ch, L)), .(Ch, T0), T1) :-
+            symbol(Ch),
             symbols(L, T0, T1).
-        atom(atom(L), T0, T1) :-
+        atom(atom(.(Ch, L)), .(Ch, T0), T1) :-
+            digit(Ch),
             digits(L, T0, T1).
 
         quoted(.(Ch, L), .(Ch, T0), T1) :-
@@ -362,9 +364,9 @@ def main():
             quoted(L, T0, T1).
         quoted(.('''', L), .('''', .('''', T0)), T1) :-
             quoted(L, T0, T1).
-        quoted(.('''', []), .('''', .(Ch, T)), T) :-
+        quoted([], .('''', .(Ch, T)), .(Ch, T)) :-
             \==(Ch, '''').
-        quoted(.('''', []), .('''', []), []).
+        quoted([], .('''', []), []).
 
         var(var(.(Ch, L)), .(Ch, T0), T1) :-
             upper(Ch),
@@ -372,7 +374,7 @@ def main():
         var(var(.('_', L)), .('_', T0), T1) :-
             idents(L, T0, T1).
 
-        struct(struct(Name, Args)), T0, T4) :-
+        struct(struct(Name, Args), T0, T4) :-
             atom(atom(Name), T0, .('(', T1)),
             ws(T1, T2),
             terms(Args, T2, T3),
@@ -407,8 +409,11 @@ def main():
             clauses(L, T2, T3).
         clauses([], T, T).
     """
-    print(parse_kb(grammar))
-
+    kb = parse_kb(grammar)
+    for i, (want, got) in enumerate(zip(rules, kb)):
+        if want != got:
+            raise AssertionError(f"clause #{i+1}:\n{want}\n\t!=\n{got}")
+    print(kb)
 
 if __name__ == '__main__':
     main()
