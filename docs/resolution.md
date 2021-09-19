@@ -3,6 +3,7 @@
 1. [About Prolog](about-prolog.md)
 1. [Resolution strategy](resolution.md)
 1. [Warren Abstract Machine](wam.md)
+1. [Indexing](indices.md)
 1. [Stuff left out](references.md)
 
 ## Depth-first resolution
