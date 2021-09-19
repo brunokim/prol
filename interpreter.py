@@ -6,7 +6,6 @@ from model import *
 from compiler import ClauseCompiler, PackageCompiler, Code, Index
 from functools import total_ordering
 from typing import Mapping, List, Optional, Iterator, Tuple, Dict
-from copy import copy, deepcopy
 from enum import Enum, auto
 
 
@@ -154,12 +153,31 @@ def indexed_codes(indices: List[Index], first_arg: Optional[Cell]) -> List[Code]
     return codes
 
 
-@dataclass
+@dataclass(frozen=True)
 class InstrAddr:
     functor: Functor
     codes: List[Code]
     order: int = 0
     instr: int = 0
+
+    def step(self) -> "InstrAddr":
+        code = self.codes[self.order]
+        if self.instr >= len(code.instructions)-1:
+            # End of code reached
+            raise CompilerError(f"reached end-of-function without proceed instruction at {self}")
+        return InstrAddr(self.functor, self.codes, self.order, self.instr+1)
+
+    def next_clause(self) -> "InstrAddr":
+        if self.order >= len(self.codes)-1:
+            raise CompilerError(f"reached last clause in predicate during backtrack at {self}")
+        return InstrAddr(self.functor, self.codes, self.order+1, 0)
+
+    def is_last_clause(self) -> bool:
+        return len(self.codes)-1 == self.order
+
+    def curr_instr(self) -> "Instruction":
+        code = self.codes[self.order]
+        return code.instructions[self.instr]
 
 
 class StructArgMode(Enum):
@@ -184,12 +202,29 @@ class MachineState:
     continuation: Optional[InstrAddr]
     env: Optional["Env"]
 
+    def clone(self) -> "MachineState":
+        return MachineState(
+            self.instr_ptr,
+            list(self.regs),
+            self.top_ref_id,
+            self.struct_arg,
+            self.continuation,
+            self.env.clone() if self.env else None,
+        )
+
 
 @dataclass
 class Env:
     slots: List[Optional[Cell]]
     continuation: Optional[InstrAddr]
     prev: Optional["Env"] = None
+
+    def clone(self) -> "Env":
+        return Env(
+            list(self.slots),
+            self.continuation,
+            self.prev.clone() if self.prev else None,
+        )
 
 
 @dataclass
@@ -353,8 +388,7 @@ class Machine:
                 else:
                     builtin_fn(*addrs)
             elif isinstance(instr, Call):
-                self.state.continuation = self.state.instr_ptr
-                self.state.continuation.instr += 1
+                self.state.continuation = self.state.instr_ptr.step()
                 self.trampoline(instr.functor)
             elif isinstance(instr, Execute):
                 self.trampoline(instr.functor)
@@ -422,30 +456,18 @@ class Machine:
             self.has_backtracked = True
 
     def instr(self) -> Instruction:
-        ptr = self.state.instr_ptr
-        predicate = ptr.codes
-        code = predicate[ptr.order]
-        return code.instructions[ptr.instr]
+        return self.state.instr_ptr.curr_instr()
 
     def forward(self):
-        ptr = self.state.instr_ptr
-        code = ptr.codes[ptr.order]
-        if ptr.instr == len(code.instructions)-1:
-            # End of code without proceed
-            raise CompilerError(f"reached end-of-function without proceed instruction at {ptr}")
-        ptr.instr += 1
-        self.state.instr_ptr = ptr
+        self.state.instr_ptr = self.state.instr_ptr.step()
 
     def backtrack(self):
         if not self.choice:
             raise NoMoreChoices()
         self.unwind_trail()
-        ptr = self.choice.state.instr_ptr
-        next_ptr = InstrAddr(ptr.functor, ptr.codes, ptr.order+1)
-        self.state = deepcopy(self.choice.state)
-        self.state.instr_ptr = next_ptr
-        self.choice.state.instr_ptr.order += 1
-        if len(self.state.instr_ptr.codes)-1 == next_ptr.order:
+        self.choice.state.instr_ptr = self.choice.state.instr_ptr.next_clause()
+        self.state = self.choice.state.clone()
+        if self.state.instr_ptr.is_last_clause():
             # Last clause in predicate, pop last choice point for previous one.
             self.choice = self.choice.prev
 
@@ -462,7 +484,7 @@ class Machine:
         self.state.instr_ptr = InstrAddr(functor, codes)
         if len(codes) > 1:
             # More than one clause for predicate requires pushing a choice point
-            self.choice = Choice(state=deepcopy(self.state), prev=self.choice)
+            self.choice = Choice(state=self.state.clone(), prev=self.choice)
 
     def new_ref(self) -> Ref:
         self.state.top_ref_id += 1
