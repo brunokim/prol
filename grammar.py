@@ -108,29 +108,37 @@ def decode_clauses(encoded: Term) -> List[Clause]:
     return [decode_clause(term) for term in terms]
 
 
+def parse_ast(text: str, grammar: str):
+    try:
+        chars = str_to_chars(text)
+        m = Machine(facts + rules, [s(grammar, chars, "Tree")])
+        solution = next(m.run())
+        return solution[Var("Tree")]
+    except StopIteration:
+        envs = Env.stack(m.deepest_state.env)
+        def env_frame(env):
+            if not env.continuation:
+                msg = "<none>"
+            else:
+                msg = str(env.continuation.functor)
+            if env.num_executes:
+                msg += f" + {env.num_executes} optimized frames"
+            return msg
+        call_stack = "\n    ".join(env_frame(env) for env in envs)
+        raise RuntimeError(f"""parse error:\n  closest solution: {m.deepest_solution}\n  call stack:\n    {call_stack}""")
+
+
 def parse_term(text: str) -> Term:
-    chars = str_to_chars(text)
-    m = Machine(facts + rules, [s("parse_term", chars, "Term")])
-    solution = next(m.run())
-    encoded_term = solution[Var('Term')]
-    return decode_term(encoded_term)
+    return decode_term(parse_ast(text, "parse_term"))
 
 
 def parse_query(text: str) -> List[Struct]:
-    chars = str_to_chars(text)
-    m = Machine(facts + rules, [s("parse_query", chars, "Terms")])
-    solution = next(m.run())
-    encoded_terms = solution[Var('Terms')]
-    terms = decode_terms(encoded_terms)
+    terms = decode_terms(parse_ast(text, "parse_query"))
     return [query_term(term) for term in terms]
 
 
 def parse_kb(text: str) -> List[Clause]:
-    chars = str_to_chars(text)
-    m = Machine(facts + rules, [s("parse_kb", chars, "Clauses")])
-    solution = next(m.run())
-    encoded_clauses = solution[Var('Clauses')]
-    return decode_clauses(encoded_clauses)
+    return decode_clauses(parse_ast(text, "parse_kb"))
 
 
 facts = (
@@ -399,11 +407,7 @@ def main():
             clauses(L, T2, T3).
         clauses([], T, T).
     """
-    chars = str_to_chars(grammar)
-
-    machine = Machine(facts + rules, [s("parse_kb", chars, "Clauses")])
-    first_solution = next(machine.run())
-    print(first_solution[Var("Clauses")])
+    print(parse_kb(grammar))
 
 
 if __name__ == '__main__':

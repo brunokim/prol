@@ -13,6 +13,7 @@ import pytest
     ('a123', Atom('a123')),
     (':', Atom(':')),
     (':-', Atom(':-')),
+    ('[]', Atom('[]')),
     ("'('", Atom('(')),
     ("'a123'", Atom('a123')),
     ("'_123'", Atom('_123')),
@@ -59,6 +60,12 @@ def test_parse_query(text, query):
         Clause(Struct("g", Atom("a"))),
     ]),
     ("p() :- a, X, q().", [Clause(Struct("p"), Struct("a"), Struct("call", Var("X")), Struct("q"))]),
+    ("""
+        parse_term(Chars, Term) :- parse_term(Term, Chars, []).
+     """, [
+        Clause(Struct("parse_term", Var("Chars"), Var("Term")),
+            Struct("parse_term", Var("Term"), Var("Chars"), Atom("[]"))),
+    ]),
 ])
 def test_parse_kb(text, clauses):
     assert parse_kb(text) == clauses

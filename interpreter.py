@@ -11,7 +11,7 @@ from enum import Enum, auto
 
 __all__ = [
     'Cell', 'Ref', 'AtomCell', 'StructCell',
-    'Machine', 'Solution',
+    'Machine', 'Solution', 'Env',
 ]
 
 
@@ -230,6 +230,14 @@ class Env:
             self.prev.clone() if self.prev else None,
         )
 
+    @staticmethod
+    def stack(env: Optional["Env"]) -> List["Env"]:
+        envs = []
+        while env:
+            envs.append(env)
+            env = env.prev
+        return reversed(envs)
+
 
 @dataclass
 class Choice:
@@ -277,6 +285,9 @@ class Machine:
         self.query_vars = query_vars
         self.max_iter = 10000
         self.has_backtracked = False
+        self.max_error_depth = 0
+        self.deepest_state = None
+        self.deepest_solution = None
 
         num_regs = 0
         for indices in self.indices_by_functor.values():
@@ -295,14 +306,6 @@ class Machine:
             depth=0,
         )
 
-    def envs(self) -> List[Env]:
-        env = self.state.env
-        envs = []
-        while env is not None:
-            envs.append(env)
-            env = env.prev
-        return envs
-
     def run(self) -> Iterator[Solution]:
         iterations = 0
         try:
@@ -319,7 +322,7 @@ class Machine:
 
     def debug_state(self):
         mark = '*' if self.has_backtracked else ' '
-        num_envs = len(self.envs())
+        num_envs = len(Env.stack(self.state.env))
         instr = str(self.instr())
         regs = ' '.join(f'{reg!s:<10}' for reg in self.state.regs)
         slots = ' '.join(f'{slot!s:<10}' for slot in self.state.env.slots) if self.state.env else ''
@@ -370,12 +373,20 @@ class Machine:
         else:
             self.backtrack()
 
+    def solution_for(self, state: MachineState) -> Optional[Solution]:
+        if not state.env:
+            return None
+        first_env = state.env
+        while first_env.prev:
+            first_env = first_env.prev
+        return Solution({x: to_term(cell) for x, cell in zip(self.query_vars, first_env.slots)})
+
     def run_instr(self, instr: Instruction) -> Iterator[Solution]:
         try:
             self.has_backtracked = False
             if isinstance(instr, Halt):
                 if self.state.env is not None:
-                    yield Solution({x: to_term(cell) for x, cell in zip(self.query_vars, self.state.env.slots)})
+                    yield self.solution_for(self.state)
                 self.backtrack()
             elif isinstance(instr, Builtin):
                 name, *addrs = instr.args
@@ -475,6 +486,14 @@ class Machine:
     def backtrack(self):
         if not self.choice:
             raise NoMoreChoices()
+        if self.state.depth > self.max_error_depth:
+            # Store the machine state in its deepest iteration, where presumably it
+            # got closer to a solution.
+            # This may help the user discover some error in their program.
+            self.deepest_state = self.state.clone()
+            self.deepest_solution = self.solution_for(self.state)
+            self.max_error_depth = self.state.depth
+
         self.unwind_trail()
         self.choice.state.instr_ptr = self.choice.state.instr_ptr.next_clause()
         self.state = self.choice.state.clone()
