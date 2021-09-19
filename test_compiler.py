@@ -26,6 +26,7 @@ testdata = [
               = X2, X1
         get_var X1, X3
         put_val X1, Y1
+        get_var X2, X4
         put_var X2, Y2
            call mul/3
         put_val X0, Y1
@@ -76,6 +77,7 @@ testdata = [
                > X3, X2
          get_var X0, X5
          put_val X0, X4
+         get_var X1, X4
          put_val X1, X2
          put_val X2, X5
             call q/3
@@ -147,6 +149,26 @@ testdata = [
      put_struct X1, s/1
       unify_val X2
            call length/2
+     """),
+    (Clause(Struct("p"),
+            Struct("f",
+                   Struct("u", Struct("g", Atom("a"))),
+                   Struct("v", Struct("g", Atom("a"))),
+                   Struct("w", Struct("h", Struct("g", Atom("a")))))),
+     """
+     put_struct X1, g/1
+     unify_atom a
+     put_struct X0, u/1
+      unify_val X1
+        get_var X1, X2
+     put_struct X1, v/1
+      unify_val X2
+        get_var X2, X3
+     put_struct X4, h/1
+      unify_val X3
+     put_struct X2, w/1
+      unify_val X4
+           call f/3
      """),
 ]
 

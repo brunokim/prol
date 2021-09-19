@@ -468,49 +468,53 @@ class ChunkCompiler:
         elsewhere."""
 
         addr: Addr
-        # Conflict resolution: move content out of register if in conflict.
-        if top_level:
-            value = self.reg_content.get(reg)
-            if value is not None and isinstance(value, Var) and value != term and value in self.parent.temps:
-                self.unset_reg(reg, value)
-                addr, _ = self.temp_addr(value)
-                if addr != reg:
-                    yield GetVariable(reg, addr)
+        terms = [(term, top_level, reg, True)]
+        while terms:
+            term, top_level, reg, first_round = terms.pop(0)
+            # Conflict resolution: move content out of register if in conflict with an argument.
+            if top_level:
+                value = self.reg_content.get(reg)
+                if value is not None and value != term and (
+                        isinstance(value, Var) and value in self.parent.temps or isinstance(value, Struct)):
+                    self.unset_reg(reg, value)
+                    addr, _ = self.temp_addr(value)
+                    if addr != reg:
+                        yield GetVariable(reg, addr)
 
-        if isinstance(term, Atom):
-            yield PutAtom(reg, term)
-        elif isinstance(term, Var):
-            addr, alloc_addr = self.var_addr(term)
-            if alloc_addr == AddrAlloc.EXISTING:
-                if addr == reg:
-                    # Filter no-op PutValue instruction that wouldn't move value around.
-                    return
-                yield PutValue(reg, addr)
-            else:
-                yield PutVariable(reg, addr)
-            if isinstance(addr, Register):
-                self.free_regs.add(addr)
-        elif isinstance(term, Struct):
-            nested_structs = {}  # type: Dict[Struct, Addr]
-            for arg in term.args:
-                if isinstance(arg, Struct):
-                    nested_structs[arg] = Register(-1)
-
-            self.free_regs.discard(reg)  # Reserve reg for put_struct instruction.
-            for struct in nested_structs:
-                addr, alloc_addr = self.temp_addr(struct)
-                if alloc_addr == AddrAlloc.NEW_STRUCT:
-                    yield from self.put_term(arg, addr)
-                nested_structs[struct] = addr
-
-            yield PutStruct(reg, term.functor())
-            for arg in term.args:
-                if isinstance(arg, Struct):
-                    yield UnifyValue(nested_structs[arg])
+            if isinstance(term, Atom):
+                yield PutAtom(reg, term)
+            elif isinstance(term, Var):
+                addr, alloc_addr = self.var_addr(term)
+                if alloc_addr == AddrAlloc.EXISTING:
+                    if addr == reg:
+                        # Filter no-op PutValue instruction that wouldn't move value around.
+                        continue
+                    yield PutValue(reg, addr)
                 else:
-                    yield from self.unify_arg(arg)
-        else:
-            raise NotImplementedError(f"put_term: unhandled term type {type(term)}")
+                    yield PutVariable(reg, addr)
+                if isinstance(addr, Register):
+                    self.free_regs.add(addr)
+            elif isinstance(term, Struct):
+                if first_round:
+                    next_terms = []
+                    self.free_regs.discard(reg)  # Reserve reg for put_struct instruction.
+                    for arg in term.args:
+                        if not isinstance(arg, Struct):
+                            continue
+                        addr, alloc_addr = self.temp_addr(arg)
+                        if alloc_addr == AddrAlloc.NEW_STRUCT:
+                            next_terms.append((arg, False, addr, True))
+                    next_terms.append((term, top_level, reg, False))
+                    terms = next_terms + terms
+                else:
+                    yield PutStruct(reg, term.functor())
+                    for arg in term.args:
+                        if isinstance(arg, Struct):
+                            yield UnifyValue(self.temp_addrs[arg])
+                        else:
+                            yield from self.unify_arg(arg)
+            else:
+                raise NotImplementedError(f"put_term: unhandled term type {type(term)}")
 
     def term_addr(self, term: Term) -> Tuple[Addr, AddrAlloc]:
         """Return address for a term."""
