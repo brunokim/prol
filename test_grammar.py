@@ -43,3 +43,22 @@ def test_parse_term(text, term):
 ])
 def test_parse_query(text, query):
     assert parse_query(text) == query
+
+
+@pytest.mark.parametrize('text, clauses', [
+    ("f().", [Clause(Struct("f"))]),
+    ("f(). g().", [Clause(Struct("f")), Clause(Struct("g"))]),
+    ("f(a).", [Clause(Struct("f", Atom("a")))]),
+    ("f(a, b).", [Clause(Struct("f", Atom("a"), Atom("b")))]),
+    ("f() :- a.", [Clause(Struct("f"), Struct("a"))]),
+    ("f(X) :- g(X).", [Clause(Struct("f", Var("X")), Struct("g", Var("X")))]),
+    ("""f(X) :- g(X).
+        g(a).
+    """, [
+        Clause(Struct("f", Var("X")), Struct("g", Var("X"))),
+        Clause(Struct("g", Atom("a"))),
+    ]),
+    ("p() :- a, X, q().", [Clause(Struct("p"), Struct("a"), Struct("call", Var("X")), Struct("q"))]),
+])
+def test_parse_kb(text, clauses):
+    assert parse_kb(text) == clauses

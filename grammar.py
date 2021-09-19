@@ -3,7 +3,7 @@ from model import *
 
 from typing import cast, List, Iterable
 
-__all__ = ['parse_term', 'parse_query']
+__all__ = ['parse_term', 'parse_query', 'parse_kb']
 
 
 def s0(name):
@@ -43,6 +43,16 @@ def chars_to_str(chars: Term) -> str:
     return ''.join(chs)
 
 
+def query_term(term: Term) -> Struct:
+    if isinstance(term, Var):
+        return s("call", term)
+    if isinstance(term, Atom):
+        return s0(term.name)
+    if isinstance(term, Struct):
+        return term
+    raise ValueError(f"unhandled term type {type(term)} ({term})")
+
+
 def decode_term(encoded: Term) -> Term:
     if not isinstance(encoded, Struct):
         raise ValueError(f"decode_term: {encoded} is not a struct")
@@ -72,6 +82,32 @@ def decode_terms(encoded: Term) -> List[Term]:
     return [decode_term(term) for term in terms]
 
 
+def decode_clause(encoded: Term) -> Clause:
+    if not isinstance(encoded, Struct):
+        raise ValueError(f"decode_clause: {encoded} is not a struct")
+    if encoded.name != "clause":
+        raise ValueError(f"decode_clause: expected 'clause', got {encoded}")
+    if len(encoded.args) == 1:
+        head = decode_term(encoded.args[0])
+        body = []
+    elif len(encoded.args) == 2:
+        head = decode_term(encoded.args[0])
+        body = decode_terms(encoded.args[1])
+    else:
+        raise ValueError(f"decode_clause: expecting functor with 1 or 2 members, got {encoded}")
+
+    if not isinstance(head, Struct):
+        raise ValueError(f"decode_clause: clause head must be a struct, got {head}")
+    return Clause(head, *(query_term(term) for term in body))
+
+
+def decode_clauses(encoded: Term) -> List[Clause]:
+    terms, tail = from_list(encoded)
+    if tail != Atom('[]'):
+        raise ValueError(f"clauses {encoded} tail is not the empty atom")
+    return [decode_clause(term) for term in terms]
+
+
 def parse_term(text: str) -> Term:
     chars = str_to_chars(text)
     m = Machine(facts + rules, [s("parse_term", chars, "Term")])
@@ -80,23 +116,21 @@ def parse_term(text: str) -> Term:
     return decode_term(encoded_term)
 
 
-def term_to_query(term: Term) -> Struct:
-    if isinstance(term, Var):
-        return s("call", term)
-    if isinstance(term, Atom):
-        return s0(term.name)
-    if isinstance(term, Struct):
-        return term
-    raise ValueError(f"unhandled term type {type(term)} ({term})")
-
-
 def parse_query(text: str) -> List[Struct]:
     chars = str_to_chars(text)
     m = Machine(facts + rules, [s("parse_query", chars, "Terms")])
     solution = next(m.run())
     encoded_terms = solution[Var('Terms')]
     terms = decode_terms(encoded_terms)
-    return [term_to_query(term) for term in terms]
+    return [query_term(term) for term in terms]
+
+
+def parse_kb(text: str) -> List[Clause]:
+    chars = str_to_chars(text)
+    m = Machine(facts + rules, [s("parse_kb", chars, "Clauses")])
+    solution = next(m.run())
+    encoded_clauses = solution[Var('Clauses')]
+    return decode_clauses(encoded_clauses)
 
 
 facts = (

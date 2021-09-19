@@ -140,6 +140,12 @@ class Clause:
         self.head = head
         self.body = body
 
+    def __hash__(self):
+        return hash((self.head, self.body))
+
+    def __eq__(self, other):
+        return isinstance(other, Clause) and self.head == other.head and self.body == other.body
+
     def __str__(self):
         if not self.body:
             return f"{self.head}."
