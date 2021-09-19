@@ -62,9 +62,17 @@ def test_parse_query(text, query):
     ("p() :- a, X, q().", [Clause(Struct("p"), Struct("a"), Struct("call", Var("X")), Struct("q"))]),
     ("""
         parse_term(Chars, Term) :- parse_term(Term, Chars, []).
+        parse_term(Chars, T0, T3) :-
+            ws(T0, T1),
+            term(Term, T1, T2),
+            ws(T2, T3).
      """, [
         Clause(Struct("parse_term", Var("Chars"), Var("Term")),
             Struct("parse_term", Var("Term"), Var("Chars"), Atom("[]"))),
+        Clause(Struct("parse_term", Var("Chars"), Var("T0"), Var("T3")),
+            Struct("ws", Var("T0"), Var("T1")),
+            Struct("term", Var("Term"), Var("T1"), Var("T2")),
+            Struct("ws", Var("T2"), Var("T3"))),
     ]),
 ])
 def test_parse_kb(text, clauses):

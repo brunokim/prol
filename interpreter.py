@@ -278,12 +278,13 @@ def compile_query(query: List[Struct]) -> Tuple[Code, List[Var]]:
 
 
 class Machine:
-    def __init__(self, package: List[Clause], query: List[Struct]):
+    def __init__(self, package: List[Clause], query: List[Struct], *, max_iter=float("Inf")):
         query_code, query_vars = compile_query(query)
         self.indices_by_functor = PackageCompiler(*package).compile()
         self.indices_by_functor[query_code.functor] = [Index(True, [query_code], {}, {})]
         self.query_vars = query_vars
-        self.max_iter = 10000
+        self.iter = 0
+        self.max_iter = max_iter
         self.has_backtracked = False
         self.max_error_depth = 0
         self.deepest_state = None
@@ -307,12 +308,12 @@ class Machine:
         )
 
     def run(self) -> Iterator[Solution]:
-        iterations = 0
         try:
-            while iterations < self.max_iter:
+            while self.iter < self.max_iter:
                 # self.debug_state()
                 yield from self.run_instr(self.instr())
-                iterations += 1
+                self.iter += 1
+            raise MaxIterReached(self.max_iter)
         except NoMoreChoices:
             pass
         except Exception as e:
@@ -693,6 +694,10 @@ class Machine:
 
 
 class NoMoreChoices(Exception):
+    pass
+
+
+class MaxIterReached(Exception):
     pass
 
 
