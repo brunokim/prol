@@ -1,3 +1,20 @@
+"""
+Sample program of a parser that can generate its own instruction set.
+
+This grammar can parse a program composed simply of atoms, vars and structs,
+within the printable ASCII character set.
+
+Atoms are reasonably capable, and can be either:
+- composed of a lower case letter + identifier letters
+- composed solely of digits
+- composed solely of symbols
+- having any char within single quotes. A single quote is itself represented by
+two single quotes.
+
+The grammar relies on two key concepts that are better explained in documentation:
+lists as cons cells and incomplete lists.
+"""
+
 from interpreter import *
 from model import *
 
@@ -141,6 +158,7 @@ def parse_kb(text: str) -> List[Clause]:
     return decode_clauses(parse_ast(text, "parse_kb"))
 
 
+# Set of facts about letters
 facts = (
     [Clause(Struct("lower", Atom(chr(i)))) for i in range(ord('a'), ord('z')+1)] +
     [Clause(Struct("upper", Atom(chr(i)))) for i in range(ord('A'), ord('Z')+1)] +
@@ -150,6 +168,8 @@ facts = (
 )
 
 
+# Actual grammar of this language. The comments are written in a higher Prolog
+# syntax, with lists within brackets and using DCGs.
 rules = [
     # parse_term(Chars, Term) :- parse_term(Term, Chars, []).
     # parse_term(Term) --> ws, term(Term), ws.
@@ -413,7 +433,8 @@ def main():
     for i, (want, got) in enumerate(zip(rules, kb)):
         if want != got:
             raise AssertionError(f"clause #{i+1}:\n{want}\n\t!=\n{got}")
-    print(kb)
+    for clause in kb:
+        print(clause)
 
 if __name__ == '__main__':
     main()

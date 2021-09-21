@@ -71,4 +71,5 @@ but currently it first stashes the variable in a safe register;
 - It shouldn't be too complex to compile clauses in an order that allows us to know how many registers
 each calling predicate may use.
 This may allow further savings on environment slot allocation. Topological sort to the rescue!
-
+- We are not handling cases of singleton or nil vars. That is, in `f(_, _, a)` the first two variables will
+be considered the same, and we'd be forced to write `f(_1, _2, a)` to have the same intended effect.
