@@ -1,5 +1,13 @@
 # Parsing
 
+1. [About Prolog](about-prolog.md)
+1. [Resolution strategy](resolution.md)
+1. [Warren Abstract Machine](wam.md)
+1. [Indexing](indices.md)
+1. [Parsing](parsing.md)
+1. [Grammar](grammar.md)
+1. [Stuff left out](references.md)
+
 Parsing is one area where logic languages shine, thanks to its ability to
 assume a structure for a char or word stream, and backtrack arbitrarily
 if it turns out not to be valid according to a grammar.

@@ -16,5 +16,7 @@ the main instructions, compiling, register allocation and machine functions.
 1. [Resolution strategy](docs/resolution.md): how a query is actually solved in Prolog. 
 1. [Warren Abstract Machine](docs/wam.md): details about the implementation attempted here.
 1. [Indexing](docs/indices.md): indexing implementation to fast-track some call patterns.
+1. [Parsing](docs/parsing.md): explaining basic structures for parsing
+1. [Grammar](docs/grammar.md): documentation for the sample application of grammar parsing.
 1. [Stuff left out](docs/references.md): what this implementation has simplified from the WAM.
 
