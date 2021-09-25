@@ -157,7 +157,7 @@ idents(Idents, .(Ch, L0), L1) :-
     Idents = .(Ch, Chars).
 ```
 
-With an AST for the code, we parse the text and build data structures from it, which is done
-with `decode_*` functions in [grammar.py](grammar.py).
+With an AST for the code, we parse the text and build data structures from it at the `decode_*`
+functions in [grammar.py](/grammar.py).
 We are able to build the exact same structures as the grammar built to parse it! Cool, huh?
 
