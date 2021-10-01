@@ -106,7 +106,7 @@ Somos forçados a escrever `f(_1, _2, a)` para ter o mesmo efeito que o esperado
 
 - Glossary, SWI-Prolog ([link](https://www.swi-prolog.org/pldoc/man?section=glossary)): um recurso muito útil sobre os termos
 usados em programação lógica para fraudes autodidatas como eu. Veja os comentários também!
-- "Warren Abstract Machine: a tutorial reconstruction", Hassan Aït-Kaci, 1999 ([link]([http://wambook.sourceforge.net/)):
+- "Warren Abstract Machine: a tutorial reconstruction", Hassan Aït-Kaci, 1999 ([link](http://wambook.sourceforge.net/)):
   o melhor recurso para se começar a entender a famosa WAM
 - "Register Allocation in a Prolog Machine", Saumya K. Debray, 1986 ([link](https://www.semanticscholar.org/paper/Register-Allocation-in-a-Prolog-Machine-Debray/be79bf12014c53607e7933717b710ac8a7bd9261)): algoritmo de alocação de registros utilizado
   nessa implementação.

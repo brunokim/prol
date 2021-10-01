@@ -95,7 +95,7 @@ be considered the same, and we'd be forced to write `f(_1, _2, a)` to have the s
 
 - Glossary, SWI-Prolog ([link](https://www.swi-prolog.org/pldoc/man?section=glossary)): a very useful source on logic programming
 for self-taught hacks like me. Check the comments as well!
-- "Warren Abstract Machine: a tutorial reconstruction", Hassan Aït-Kaci, 1999 ([link]([http://wambook.sourceforge.net/)):
+- "Warren Abstract Machine: a tutorial reconstruction", Hassan Aït-Kaci, 1999 ([link](http://wambook.sourceforge.net/)):
   the best resource to start understanding the famous WAM
 - "Register Allocation in a Prolog Machine", Saumya K. Debray, 1986 ([link](https://www.semanticscholar.org/paper/Register-Allocation-in-a-Prolog-Machine-Debray/be79bf12014c53607e7933717b710ac8a7bd9261)): register allocation algorithm used in this implementation
 - "Prolog DCG Primer", [Markus Triska](https://github.com/triska) ([link](https://www.metalevel.at/prolog/dcg)): A nice and complete introduction on DCGs
