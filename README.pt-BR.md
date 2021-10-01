@@ -13,11 +13,11 @@ da máquina.
 
 ## Documentação
 
-1. [Sobre Prolog](docs/about-prolog.md): uma introdução apressada se você não sabe do que isso se trata.
-1. [Estratégia de resolução](docs/resolution.md): como uma consulta é realmente resolvida em Prolog.
-1. [Warren Abstract Machine](docs/wam.md): tentativa de explicar a implementação.
-1. [Indexando](docs/indices.md): implementação de indexação para acelerar alguns padrões de chamada.
-1. [Parsing](docs/parsing.md): explicação das estruturas básicas de parsing.
-1. [Gramática](docs/grammar.md): documentação para a aplicação de exemplo de parsing de gramática.
-1. [Coisas extras](docs/references.md): o que esta implementação simplificou da WAM, e referências.
+1. [Sobre Prolog](docs.pt-BR/about-prolog.md): uma introdução apressada se você não sabe do que isso se trata.
+1. [Estratégia de resolução](docs.pt-BR/resolution.md): como uma consulta é realmente resolvida em Prolog.
+1. [Warren Abstract Machine](docs.pt-BR/wam.md): tentativa de explicar a implementação.
+1. [Indexando](docs.pt-BR/indices.md): implementação de indexação para acelerar alguns padrões de chamada.
+1. [Parsing](docs.pt-BR/parsing.md): explicação das estruturas básicas de parsing.
+1. [Gramática](docs.pt-BR/grammar.md): documentação para a aplicação de exemplo de parsing de gramática.
+1. [Coisas extras](docs.pt-BR/references.md): o que esta implementação simplificou da WAM, e referências.
 
