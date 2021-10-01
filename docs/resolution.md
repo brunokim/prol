@@ -23,6 +23,38 @@ restored, but now using the subsequent clause.
 This is called _backtracking_.
 Multiple choice points may be stacked representing branches yet to explore.
 
+In the diagram below, we have the resolution flow for the previous section's example.
+At each branching we insert a choicepoint in the stack.
+When we find a state with no solution (marked with ✗), the choicepoint is popped and
+its state is restored, to explore another possibility.
+A solution is found at step #10 with `X = república` (marked with ✓).
+A choicepoint still exists in the stack, marked with `*`, inserted just before step #3.
+It is possible to restore this state and search for new solutions.
+
+```none
+  (1)              1) walk2(são_bento, X).
+   |               2) walk(são_bento, C),       walk(C, X),         são_bento \== X.
+  (2)              *) connection(C, são_bento), walk(C, X),         são_bento \== X.
+   |               3) connection(são_bento, C), walk(C, X),         são_bento \== X.
+   +----[*]        4) C = luz,                  walk(luz, X),       são_bento \== X.
+   |               5)                           connection(luz, X), são_bento \== X.
+  (3)              6)                           connection(X, luz), são_bento \== X.
+   |               7)                           X = são_bento,      são_bento \== são_bento.
+  (4)              8)                                               são_bento \== são_bento.
+   |               9)                           X = república,      são_bento \== república.
+   +----.         10)                                               são_bento \== república. 
+   |    |          
+  (5)  (6)
+   |    |
+   ✗    +----.
+        |    |
+       (7)  (9)
+        |    |
+       (8)  (10)
+        |    |
+        ✗    ✓ 
+```
+
 As we proceed on an hypothesis, we accumulate a set of variable bindings, that is, a
 set of values that correspond to some of the variables.
 A variable that has a term associated is said to be _bound_; a term that has no unbound
