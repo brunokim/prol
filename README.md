@@ -18,5 +18,5 @@ the main instructions, compiling, register allocation and machine functions.
 1. [Indexing](docs/indices.md): indexing implementation to fast-track some call patterns.
 1. [Parsing](docs/parsing.md): explaining basic structures for parsing
 1. [Grammar](docs/grammar.md): documentation for the sample application of grammar parsing.
-1. [Stuff left out](docs/references.md): what this implementation has simplified from the WAM.
+1. [Stuff left out](docs/references.md): what this implementation has simplified from the WAM, and references.
 
