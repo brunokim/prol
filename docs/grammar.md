@@ -1,4 +1,4 @@
-## Grammar
+# Grammar
 
 1. [About Prolog](about-prolog.md)
 1. [Resolution strategy](resolution.md)

@@ -62,6 +62,21 @@ based on the term type, while preserving the same resolution order.
 When there are multiple clauses with the same type, it also walk only on
 them using a linked list created with `try`/`retry`/`trust` instructions.
 
+## Grammar
+
+The grammar created here is intentionally poorer than a usual Prolog, so that it doesn't
+distract your study. There are some interesting things to add:
+
+- Comments, starting with '%' and going until the end of line (or program);
+- Lists, both closed like `[a,b,c]` or incomplete like `[a,b,c|X]`;
+- Text strings, using double quotes to represent a list of atoms, that is, `"abc" = [a,b,c]`;
+- Escape chars in atoms; the current grammar uses two simple quotes to represent a single
+simple quote inside an atom. Other Prologs use a backslash to escape a single quote, which
+also demands escaping the backslash itself, and may be used with other chars like linefeed or tab;
+- The constructions we made with difference lists are so special that they deserve their own
+syntax, called _definite clause grammar_, or DCG. The conversion from a DCG into a clause
+using difference lists is reasonably direct.
+
 ## Epilog
 
 I hope this repository is a nice study resource for all 4 of you interested in learning
@@ -75,3 +90,13 @@ each calling predicate may use.
 This may allow further savings on environment slot allocation. Topological sort to the rescue!
 - We are not handling cases of singleton or nil vars. That is, in `f(_, _, a)` the first two variables will
 be considered the same, and we'd be forced to write `f(_1, _2, a)` to have the same intended effect.
+
+## References
+
+- Glossary, SWI-Prolog ([link](https://www.swi-prolog.org/pldoc/man?section=glossary)): a very useful source on logic programming
+for self-taught hacks like me. Check the comments as well!
+- "Warren Abstract Machine: a tutorial reconstruction", Hassan Aït-Kaci, 1999 ([link]([http://wambook.sourceforge.net/)):
+  the best resource to start understanding the famous WAM
+- "Register Allocation in a Prolog Machine", Saumya K. Debray, 1986 ([link](https://www.semanticscholar.org/paper/Register-Allocation-in-a-Prolog-Machine-Debray/be79bf12014c53607e7933717b710ac8a7bd9261)): register allocation algorithm used in this implementation
+- "Prolog DCG Primer", [Markus Triska](https://github.com/triska) ([link](https://www.metalevel.at/prolog/dcg)): A nice and complete introduction on DCGs
+

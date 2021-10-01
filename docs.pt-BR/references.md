@@ -80,7 +80,7 @@ para significar uma aspa simples dentro de um átomo.
 Outros Prologs usam a barra invertida para escapar a aspa simples, o que exige também
 escapar a própria barra invertida, e até outros caracteres como LF e tab.
 - As construções que fizemos com diferenças de listas são tão especiais que merecem uma
-sintaxe própria, de _directed clause grammar_ ou DCG. A conversão de um DCG para uma cláusula
+sintaxe própria, de _definite clause grammar_ ou DCG. A conversão de um DCG para uma cláusula
 usando diferença de listas é razoavelmente direta.
 
 ## Epílogo
@@ -102,10 +102,13 @@ alocação de slots de ambiente. Basta utilizar ordenação topológica!
 Isto é, em `f(_, _, a)` as duas primeiras variáveis são consideradas a mesma.
 Somos forçados a escrever `f(_1, _2, a)` para ter o mesmo efeito que o esperado em outros Prologs.
 
-## Referências
+## Referências (em inglês)
 
+- Glossary, SWI-Prolog ([link](https://www.swi-prolog.org/pldoc/man?section=glossary)): um recurso muito útil sobre os termos
+usados em programação lógica para fraudes autodidatas como eu. Veja os comentários também!
 - "Warren Abstract Machine: a tutorial reconstruction", Hassan Aït-Kaci, 1999 ([link]([http://wambook.sourceforge.net/)):
   o melhor recurso para se começar a entender a famosa WAM
 - "Register Allocation in a Prolog Machine", Saumya K. Debray, 1986 ([link](https://www.semanticscholar.org/paper/Register-Allocation-in-a-Prolog-Machine-Debray/be79bf12014c53607e7933717b710ac8a7bd9261)): algoritmo de alocação de registros utilizado
   nessa implementação.
 - "Prolog DCG Primer", [Markus Triska](https://github.com/triska) ([link](https://www.metalevel.at/prolog/dcg)): uma boa e completa introdução sobre DCGs
+
