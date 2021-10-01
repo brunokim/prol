@@ -10,6 +10,7 @@ da máquina.
 - compiler.py: Compilação de uma lista de regras em uma lista de instruções.
 - interpreter.py: Interpretador que executa a listagem de instruções para uma dada consulta.
 - grammar.py: Uma aplicação de exemplo do interpretador, com uma gramática que parseia a si mesma.
+  Teste com `python -m grammar` e compare com o texto no arquivo!
 
 ## Documentação
 
