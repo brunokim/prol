@@ -144,6 +144,27 @@ Tree = clause(
       [])).
 ```
 
+Or, more visually:
+
+```none
+   Tree = clause(.,.)
+                 | '-----------------[ struct(.,.)
+              struct(.,.)                     | '--[ atom(.)
+                     | '--[ var(.) ]         "gh"         |
+                    "f"         |                        "a"
+                               "X"                 , var(.)
+                                                         |
+                                                        "X"
+                                                   ]
+                                     ]
+```
+
+That is, a `clause` has two elements: the head and the body (a list of terms).
+A `struct` has two terms: its name and its args (also a list of terms).
+`atom` and `var` both have only their names.
+Names are represented above within double quotes, but in the AST you see that
+they are actually atom lists.
+
 The `clause` predicate becomes:
 
 ```prolog
