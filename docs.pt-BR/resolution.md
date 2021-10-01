@@ -20,7 +20,7 @@ para a próxima cláusula a se tentar no predicado.
 O fluxo de execução continua testando a primeira cláusula; se o fluxo falhar, isto é,
 se ele chegar em um estado sem solução, o último _choice point_ é desempilhado e o
 estado é restaurado, mas agora usando a cláusula subsequente.
-Isto é chamado _backtracking_ ("recuar").
+Isto é chamado _backtracking_ ("retroceder").
 Múltiplos _choice points_ podem ser empilhados, representando ramos ainda inexplorados
 na árvore de soluções.
 
@@ -63,7 +63,7 @@ Uma variável que tenha um termo associado é dita _ligada_ (_bound_); um termo 
 não tenha nenhuma variável livre é dito _fechado_ (_ground_).
 É possível alcançar um estado insatisfeito, onde as ligações presentes levam a uma
 falha lógica, tal que nenhum fato corresponda ao termo atual.
-Neste caso, ao recuar, nós desfazemos todas as ligações que foram criadas desde o
+Neste caso, ao retroceder, nós desfazemos todas as ligações que foram criadas desde o
 _choice point_, realmente restaurando ao mesmo estado anterior.
 
 ## Unificação
