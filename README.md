@@ -9,6 +9,7 @@ the main instructions, compiling, register allocation and machine functions.
 - compiler.py: Compiling of a list of rules into a list of instructions.
 - interpreter.py: Interpreter that execute the instruction listing for a given query.
 - grammar.py: Sample application of interpreter, with a grammar that can parse itself.
+  Try it out with `python -m grammar` and compare with the text in the file!
 
 ## Documentation
 
