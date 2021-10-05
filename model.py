@@ -195,6 +195,7 @@ class Instruction:
 
 @dataclass(frozen=True)
 class Builtin(Instruction):
+    name = "builtin"
     args: List[Any]
 
     def __str__(self):

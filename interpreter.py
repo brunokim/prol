@@ -286,6 +286,10 @@ class Machine:
         self.iter = 0
         self.max_iter = max_iter
         self.has_backtracked = False
+
+        # Utility for debugging grammars, storing the deepest solution, which is likely to
+        # represent the farthest in the string we got before failing.
+        self.store_deepest_solution = False
         self.max_error_depth = 0
         self.deepest_state = None
         self.deepest_solution = None
@@ -385,98 +389,134 @@ class Machine:
     def run_instr(self, instr: Instruction) -> Iterator[Solution]:
         try:
             self.has_backtracked = False
-            if isinstance(instr, Halt):
+            instr_fn = {
+                'builtin': self.run_builtin,
+                'call': self.run_call,
+                'execute': self.run_execute,
+                'proceed': self.run_proceed,
+                'allocate': self.run_allocate,
+                'deallocate': self.run_deallocate,
+                'get_var': self.run_get_var,
+                'get_val': self.run_get_val,
+                'get_atom': self.run_get_atom,
+                'get_struct': self.run_get_struct,
+                'put_var': self.run_put_var,
+                'put_val': self.run_put_val,
+                'put_atom': self.run_put_atom,
+                'put_struct': self.run_put_struct,
+                'unify_var': self.run_unify_arg,
+                'unify_val': self.run_unify_arg,
+                'unify_atom': self.run_unify_arg,
+            }.get(instr.name)
+            if instr_fn is not None:
+                instr_fn(instr)
+            elif isinstance(instr, Halt):
                 if self.state.env is not None:
                     yield self.solution_for(self.state)
                 self.backtrack()
-            elif isinstance(instr, Builtin):
-                name, *addrs = instr.args
-                builtin_fn = {
-                    '=': self.builtin_eq,
-                    '<': self.builtin_lt,
-                    '>': self.builtin_gt,
-                    '=<': self.builtin_le,
-                    '>=': self.builtin_ge,
-                    '==': self.builtin_equivalent,
-                    r'\==': self.builtin_not_equivalent,
-                }.get(name)
-                if builtin_fn is None:
-                    self.backtrack()
-                else:
-                    builtin_fn(*addrs)
-            elif isinstance(instr, Call):
-                self.state.depth += 1
-                self.state.continuation = self.state.instr_ptr.step()
-                self.trampoline(instr.functor)
-            elif isinstance(instr, Execute):
-                self.state.depth += 1
-                self.state.env.num_executes += 1
-                self.trampoline(instr.functor)
-            elif isinstance(instr, Proceed):
-                self.state.depth -= self.state.env.num_executes + 1
-                self.state.env.num_executes = 0
-                if self.state.continuation is None:
-                    raise CompilerError(f"proceed called without continuation")
-                self.state.instr_ptr = self.state.continuation
-                self.state.continuation = None
-            elif isinstance(instr, Allocate):
-                self.state.env = Env(
-                    slots=[None for _ in range(instr.num_perms)],
-                    continuation=self.state.continuation,
-                    num_executes=0,
-                    prev=self.state.env,
-                )
-                self.state.continuation = None
-                self.forward()
-            elif isinstance(instr, Deallocate):
-                if self.state.env is None:
-                    raise CompilerError(f"deallocate called without environment")
-                self.state.continuation = self.state.env.continuation
-                self.state.env = self.state.env.prev
-                self.forward()
-            elif isinstance(instr, GetVariable):
-                self.set(instr.addr, self.get_reg(instr.reg))
-                self.forward()
-            elif isinstance(instr, GetValue):
-                self.unify(self.get_reg(instr.reg), self.get(instr.addr))
-            elif isinstance(instr, GetAtom):
-                self.read_atom(instr.atom, self.get(instr.reg))
-            elif isinstance(instr, GetStruct):
-                cell = self.get(instr.reg).deref()
-                if isinstance(cell, StructCell):
-                    if cell.functor() != instr.functor:
-                        raise UnifyError(cell.functor(), instr.functor)
-                    self.state.struct_arg = StructArg(StructArgMode.READ, cell)
-                elif isinstance(cell, Ref):
-                    struct = StructCell.from_functor(instr.functor)
-                    self.bind_ref(cell, struct)
-                    self.state.struct_arg = StructArg(StructArgMode.WRITE, struct)
-                else:
-                    raise UnifyError(cell, instr.functor)
-                self.forward()
-            elif isinstance(instr, PutVariable):
-                x = self.new_ref()
-                self.set_reg(instr.reg, x)
-                self.set(instr.addr, x)
-                self.forward()
-            elif isinstance(instr, PutValue):
-                self.set_reg(instr.reg, self.get(instr.addr))
-                self.forward()
-            elif isinstance(instr, PutAtom):
-                self.set_reg(instr.reg, AtomCell(instr.atom))
-                self.forward()
-            elif isinstance(instr, PutStruct):
-                s = StructCell.from_functor(instr.functor)
-                self.set_reg(instr.reg, s)
-                self.state.struct_arg = StructArg(StructArgMode.WRITE, s)
-                self.forward()
-            elif isinstance(instr, (UnifyVariable, UnifyValue, UnifyAtom)):
-                self.unify_arg(instr)
             else:
                 raise NotImplementedError(f"Machine.run: not implemented for instr type {type(instr)}")
         except UnifyError as e:
             self.backtrack()
             self.has_backtracked = True
+
+    def run_builtin(self, instr: Builtin):
+        name, *addrs = instr.args
+        builtin_fn = {
+            '=': self.builtin_eq,
+            '<': self.builtin_lt,
+            '>': self.builtin_gt,
+            '=<': self.builtin_le,
+            '>=': self.builtin_ge,
+            '==': self.builtin_equivalent,
+            r'\==': self.builtin_not_equivalent,
+        }.get(name)
+        if builtin_fn is None:
+            self.backtrack()
+        else:
+            builtin_fn(*addrs)
+
+    def run_call(self, instr: Call):
+        self.state.depth += 1
+        self.state.continuation = self.state.instr_ptr.step()
+        self.trampoline(instr.functor)
+
+    def run_execute(self, instr: Execute):
+        self.state.depth += 1
+        self.state.env.num_executes += 1
+        self.trampoline(instr.functor)
+
+    def run_proceed(self, instr: Proceed):
+        self.state.depth -= self.state.env.num_executes + 1
+        self.state.env.num_executes = 0
+        if self.state.continuation is None:
+            raise CompilerError(f"proceed called without continuation")
+        self.state.instr_ptr = self.state.continuation
+        self.state.continuation = None
+
+    def run_allocate(self, instr: Allocate):
+        self.state.env = Env(
+            slots=[None for _ in range(instr.num_perms)],
+            continuation=self.state.continuation,
+            num_executes=0,
+            prev=self.state.env,
+        )
+        self.state.continuation = None
+        self.forward()
+
+    def run_deallocate(self, instr: Deallocate):
+        if self.state.env is None:
+            raise CompilerError(f"deallocate called without environment")
+        self.state.continuation = self.state.env.continuation
+        self.state.env = self.state.env.prev
+        self.forward()
+
+    def run_get_var(self, instr: GetVariable):
+        self.set(instr.addr, self.get_reg(instr.reg))
+        self.forward()
+
+    def run_get_val(self, instr: GetValue):
+        self.unify(self.get_reg(instr.reg), self.get(instr.addr))
+
+    def run_get_atom(self, instr: GetAtom):
+        self.read_atom(instr.atom, self.get(instr.reg))
+
+    def run_get_struct(self, instr: GetStruct):
+        cell = self.get(instr.reg).deref()
+        if isinstance(cell, StructCell):
+            if cell.functor() != instr.functor:
+                raise UnifyError(cell.functor(), instr.functor)
+            self.state.struct_arg = StructArg(StructArgMode.READ, cell)
+        elif isinstance(cell, Ref):
+            struct = StructCell.from_functor(instr.functor)
+            self.bind_ref(cell, struct)
+            self.state.struct_arg = StructArg(StructArgMode.WRITE, struct)
+        else:
+            raise UnifyError(cell, instr.functor)
+        self.forward()
+
+    def run_put_var(self, instr: PutVariable):
+        x = self.new_ref()
+        self.set_reg(instr.reg, x)
+        self.set(instr.addr, x)
+        self.forward()
+
+    def run_put_val(self, instr: PutValue):
+        self.set_reg(instr.reg, self.get(instr.addr))
+        self.forward()
+
+    def run_put_atom(self, instr: PutAtom):
+        self.set_reg(instr.reg, AtomCell(instr.atom))
+        self.forward()
+
+    def run_put_struct(self, instr: PutStruct):
+        s = StructCell.from_functor(instr.functor)
+        self.set_reg(instr.reg, s)
+        self.state.struct_arg = StructArg(StructArgMode.WRITE, s)
+        self.forward()
+
+    def run_unify_arg(self, instr: Instruction):
+        self.unify_arg(instr)
 
     def instr(self) -> Instruction:
         return self.state.instr_ptr.curr_instr()
@@ -487,7 +527,7 @@ class Machine:
     def backtrack(self):
         if not self.choice:
             raise NoMoreChoices()
-        if self.state.depth > self.max_error_depth:
+        if self.store_deepest_solution and self.state.depth > self.max_error_depth:
             # Store the machine state in its deepest iteration, where presumably it
             # got closer to a solution.
             # This may help the user discover some error in their program.
