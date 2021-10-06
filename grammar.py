@@ -132,7 +132,10 @@ def parse_ast(text: str, grammar: str):
         solution = next(m.run())
         return solution[Var("Tree")]
     except StopIteration:
+        if not m.deepest_state:
+            raise RuntimeError(f"parse error, enable Machine.store_deepest_state for more info")
         envs = Env.stack(m.deepest_state.env)
+
         def env_frame(env):
             if not env.continuation:
                 msg = "<none>"
@@ -142,7 +145,8 @@ def parse_ast(text: str, grammar: str):
                 msg += f" + {env.num_executes} optimized frames"
             return msg
         call_stack = "\n    ".join(env_frame(env) for env in envs)
-        raise RuntimeError(f"""parse error:\n  closest solution: {m.deepest_solution}\n  call stack:\n    {call_stack}""")
+        raise RuntimeError(
+            f"""parse error:\n  closest solution: {m.deepest_solution}\n  call stack:\n    {call_stack}""")
 
 
 def parse_term(text: str) -> Term:
