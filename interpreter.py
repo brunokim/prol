@@ -7,6 +7,7 @@ from compiler import ClauseCompiler, PackageCompiler, Code, Index
 from functools import total_ordering
 from typing import Mapping, List, Optional, Iterator, Tuple, Dict
 from enum import Enum, auto
+import operator
 
 
 __all__ = [
@@ -333,51 +334,6 @@ class Machine:
         slots = ' '.join(f'{slot!s:<10}' for slot in self.state.env.slots) if self.state.env else ''
         print(f"{mark} {self.state.depth:04d} {'  '*num_envs}{instr:<{40-num_envs*2}} {regs} | {slots}")
 
-    def builtin_eq(self, a1: Addr, a2: Addr):
-        self.unify(self.get(a1), self.get(a2))
-
-    def builtin_lt(self, a1: Addr, a2: Addr):
-        c1, c2 = self.get(a1).deref(), self.get(a2).deref()
-        if c1 < c2:
-            self.forward()
-        else:
-            self.backtrack()
-
-    def builtin_gt(self, a1: Addr, a2: Addr):
-        c1, c2 = self.get(a1).deref(), self.get(a2).deref()
-        if c1 > c2:
-            self.forward()
-        else:
-            self.backtrack()
-
-    def builtin_le(self, a1: Addr, a2: Addr):
-        c1, c2 = self.get(a1).deref(), self.get(a2).deref()
-        if c1 <= c2:
-            self.forward()
-        else:
-            self.backtrack()
-
-    def builtin_ge(self, a1: Addr, a2: Addr):
-        c1, c2 = self.get(a1).deref(), self.get(a2).deref()
-        if c1 >= c2:
-            self.forward()
-        else:
-            self.backtrack()
-
-    def builtin_equivalent(self, a1: Addr, a2: Addr):
-        c1, c2 = self.get(a1).deref(), self.get(a2).deref()
-        if c1 == c2:
-            self.forward()
-        else:
-            self.backtrack()
-
-    def builtin_not_equivalent(self, a1: Addr, a2: Addr):
-        c1, c2 = self.get(a1).deref(), self.get(a2).deref()
-        if c1 != c2:
-            self.forward()
-        else:
-            self.backtrack()
-
     def solution_for(self, state: MachineState) -> Optional[Solution]:
         if not state.env:
             return None
@@ -402,21 +358,30 @@ class Machine:
             self.backtrack()
             self.has_backtracked = True
 
+    comparisons = {
+        '<': operator.lt,
+        '>': operator.gt,
+        '=<': operator.le,
+        '>=': operator.ge,
+        '==': operator.eq,
+        '\\==': operator.ne,
+    }
+
     def run_builtin(self, instr: Builtin):
         name, *addrs = instr.args
-        builtin_fn = {
-            '=': self.builtin_eq,
-            '<': self.builtin_lt,
-            '>': self.builtin_gt,
-            '=<': self.builtin_le,
-            '>=': self.builtin_ge,
-            '==': self.builtin_equivalent,
-            r'\==': self.builtin_not_equivalent,
-        }.get(name)
-        if builtin_fn is None:
-            self.backtrack()
+        if name == '=':
+            a1, a2 = addrs
+            self.unify(self.get(a1), self.get(a2))
+        elif name in self.comparisons:
+            comparison = self.comparisons[name]
+            a1, a2 = addrs
+            c1, c2 = self.get(a1).deref(), self.get(a2).deref()
+            if comparison(c1, c2):
+                self.forward()
+            else:
+                self.backtrack()
         else:
-            builtin_fn(*addrs)
+            raise ValueError(f"Machine.run_builtin: unknown builtin name {name!r}")
 
     def run_call(self, instr: Call):
         self.state.depth += 1
