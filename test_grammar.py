@@ -68,11 +68,11 @@ def test_parse_query(text, query):
             ws(T2, T3).
      """, [
         Clause(Struct("parse_term", Var("Chars"), Var("Term")),
-            Struct("parse_term", Var("Term"), Var("Chars"), Atom("[]"))),
+               Struct("parse_term", Var("Term"), Var("Chars"), Atom("[]"))),
         Clause(Struct("parse_term", Var("Chars"), Var("T0"), Var("T3")),
-            Struct("ws", Var("T0"), Var("T1")),
-            Struct("term", Var("Term"), Var("T1"), Var("T2")),
-            Struct("ws", Var("T2"), Var("T3"))),
+               Struct("ws", Var("T0"), Var("T1")),
+               Struct("term", Var("Term"), Var("T1"), Var("T2")),
+               Struct("ws", Var("T2"), Var("T3"))),
     ]),
 ])
 def test_parse_kb(text, clauses):
