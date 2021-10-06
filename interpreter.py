@@ -389,25 +389,7 @@ class Machine:
     def run_instr(self, instr: Instruction) -> Iterator[Solution]:
         try:
             self.has_backtracked = False
-            instr_fn = {
-                'builtin': self.run_builtin,
-                'call': self.run_call,
-                'execute': self.run_execute,
-                'proceed': self.run_proceed,
-                'allocate': self.run_allocate,
-                'deallocate': self.run_deallocate,
-                'get_var': self.run_get_var,
-                'get_val': self.run_get_val,
-                'get_atom': self.run_get_atom,
-                'get_struct': self.run_get_struct,
-                'put_var': self.run_put_var,
-                'put_val': self.run_put_val,
-                'put_atom': self.run_put_atom,
-                'put_struct': self.run_put_struct,
-                'unify_var': self.run_unify_arg,
-                'unify_val': self.run_unify_arg,
-                'unify_atom': self.run_unify_arg,
-            }.get(instr.name)
+            instr_fn = getattr(self, f'run_{instr.name}', None)
             if instr_fn is not None:
                 instr_fn(instr)
             elif isinstance(instr, Halt):
@@ -515,7 +497,13 @@ class Machine:
         self.state.struct_arg = StructArg(StructArgMode.WRITE, s)
         self.forward()
 
-    def run_unify_arg(self, instr: Instruction):
+    def run_unify_var(self, instr: UnifyVariable):
+        self.unify_arg(instr)
+
+    def run_unify_val(self, instr: UnifyValue):
+        self.unify_arg(instr)
+
+    def run_unify_atom(self, instr: UnifyAtom):
         self.unify_arg(instr)
 
     def instr(self) -> Instruction:
@@ -537,10 +525,12 @@ class Machine:
 
         self.unwind_trail()
         self.choice.state.instr_ptr = self.choice.state.instr_ptr.next_clause()
-        self.state = self.choice.state.clone()
-        if self.state.instr_ptr.is_last_clause():
+        if self.choice.state.instr_ptr.is_last_clause():
             # Last clause in predicate, pop last choice point for previous one.
+            self.state = self.choice.state
             self.choice = self.choice.prev
+        else:
+            self.state = self.choice.state.clone()
 
     def trampoline(self, functor: Functor):
         first_arg = None
