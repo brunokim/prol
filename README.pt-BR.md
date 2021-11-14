@@ -12,6 +12,16 @@ da máquina.
 - grammar.py: Uma aplicação de exemplo do interpretador, com uma gramática que parseia a si mesma.
   Teste com `python -m grammar` e compare com o texto no arquivo!
 
+## Visualizador de debug
+
+Após criar um objeto `Machine()`, você pode setar o atributo `debug_filename` com o nome
+de um arquivo onde ele vai escrever o estado interno da máquina como um JSON para cada iteração.
+Você pode visualizar a execução da máquina rodando um servidor HTTP dentro da pasta debug/,
+por exemplo, com `python -m http.server`, e carregando o arquivo JSONL.
+Como uma amostra, `debugtest/interpreter.jsonl` contém a execução de `interpreter.py`.
+
+![Screenshot do visualizador de debug, mostrando as instruções, valores de registros e controles](docs/debug-view.png)
+
 ## Documentação
 
 1. [Sobre Prolog](docs.pt-BR/about-prolog.md): uma introdução apressada se você não sabe do que isso se trata.

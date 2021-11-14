@@ -11,6 +11,16 @@ the main instructions, compiling, register allocation and machine functions.
 - grammar.py: Sample application of interpreter, with a grammar that can parse itself.
   Try it out with `python -m grammar` and compare with the text in the file!
 
+## Debug viewer
+
+After creating a `Machine()` object, you may set its `debug_filename` attribute with the
+name of a file where it will write the machine's internal state as a JSON for each iteration.
+You may visualize the execution by running an HTTP server within the debug/ folder, e.g.
+with `python -m http.server`, and loading the JSONL file.
+As a sample, `debugtest/interpreter.jsonl` contains the execution for `interpreter.py`.
+
+![Screenshot of debug view, showcasing instructions, register values and controls](docs/debug-view.png)
+
 ## Documentation
 
 1. [About Prolog](docs/about-prolog.md): a hurried primer if you don't know what it is about.
