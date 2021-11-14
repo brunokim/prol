@@ -419,106 +419,48 @@ export class Wam {
 
     instructionFirstArg(instr) {
         switch (instr.Type) {
-        case "putStruct":
+        case "getVal":
+        case "getVar":
+        case "getAtom":
         case "getStruct":
-            return instr.Functor
+        case "putVal":
+        case "putVar":
+        case "putAtom":
+        case "putStruct":
+            return instr.Reg
+        case "unifyVal":
+        case "unifyVar":
+            return instr.Addr
+        case "unifyAtom":
+            return instr.Atom
         case "call":
         case "execute":
-            if (instr.Pkg == "") {
-                return instr.Functor
-            }
-            return instr.Pkg
-        case "putConstant":
-        case "getConstant":
-        case "unifyConstant":
-            return instr.Constant
-        case "putVariable":
-        case "putValue":
-        case "getVariable":
-        case "getValue":
-        case "unifyVariable":
-        case "unifyValue":
-        case "callMeta":
-        case "executeMeta":
-            return instr.Addr
-        case "importPkg":
-        case "putAttr":
-        case "getAttr":
-        case "delAttr":
-            return instr.Pkg
-        case "unifyVoid":
+            return instr.Functor
         case "allocate":
-            return instr.NumVars
-        case "putPair":
-        case "getPair":
-            return instr.Tag
-        case "tryMeElse":
-        case "retryMeElse":
-            return this.instructionAddress(instr.Alternative)
-        case "try":
-        case "retry":
-        case "trust":
-        case "jump":
-            return this.instructionAddress(instr.Continuation)
-        case "label":
-            return instr.ID
-        case "switchOnTerm":
-            return this.switchTable({
-                'if_var': instr.IfVar,
-                'if_const': instr.IfConstant,
-                'if_struct': instr.IfStruct,
-                'if_list': instr.IfList,
-                'if_assoc': instr.IfAssoc,
-                'if_dict': instr.IfDict,
-            })
-        case "switchOnConstant":
-        case "switchOnStruct":
-            return this.switchTable(instr.Continuation)
-        case "proceed":
-            return instr.Mode
-        case "inlineUnify":
-            return instr.Addr1
+            return instr.NumPerms
         }
         return null
     }
 
     instructionSecondArg(instr) {
         switch (instr.Type) {
-        case "putStruct":
-        case "putVariable":
-        case "putValue":
-        case "putConstant":
-        case "putPair":
-        case "getStruct":
-        case "getVariable":
-        case "getValue":
-        case "getConstant":
-        case "getPair":
-            return instr.ArgAddr
-        case "callMeta":
-        case "executeMeta":
-            return olist(instr.Params)
-        case "putAttr":
-        case "getAttr":
-        case "delAttr":
+        case "getVal":
+        case "getVar":
+        case "putVal":
+        case "putVar":
             return instr.Addr
-        case "inlineUnify":
-            return instr.Addr2
-        case "call":
-        case "execute":
-            if (instr.Pkg != "") {
-                return instr.Functor
-            }
-            return null
+        case "getAtom":
+        case "putAtom":
+            return instr.Atom
+        case "getStruct":
+        case "putStruct":
+            return instr.Functor
         }
         return null
     }
 
     instructionThirdArg(instr) {
         switch (instr.Type) {
-        case "putAttr":
-        case "getAttr":
-            return instr.Attribute
         }
         return null
     }

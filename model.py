@@ -1,7 +1,7 @@
 from dataclasses import dataclass, fields
 from typing import List, ClassVar, Any, Tuple
 import re
-from json_debug import to_json, StrJsonMixin
+from json_debug import to_json, StrJsonMixin, snake2camel, snake2pascal
 
 __all__ = [
     'Term', 'Var', 'Atom', 'Struct', 'Functor', 'Clause',
@@ -194,10 +194,10 @@ class Instruction:
         return f"{self.name} {args}"
 
     def to_json(self):
-        obj = {'Type': self.name}
+        obj = {'Type': snake2camel(self.name)}
         for field in fields(self):
             value = getattr(self, field.name)
-            obj[field.name] = to_json(value)
+            obj[snake2pascal(field.name)] = to_json(value)
         return obj
 
 
