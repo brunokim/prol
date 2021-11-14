@@ -26,36 +26,39 @@ package = [
 ]
 
 testdata = [
-    ([
-        # ?- length(L, s(s(s(0)))), member(a, L).
-        Struct("length", Var("L"), Struct("s", Struct("s", Struct("s", Atom("0"))))),
-        Struct("member", Atom("a"), Var("L")),
-    ], [
-        Solution({Var("L"): to_list([Atom("a"), Var("_"), Var("_")])}),
-        Solution({Var("L"): to_list([Var("_"), Atom("a"), Var("_")])}),
-        Solution({Var("L"): to_list([Var("_"), Var("_"), Atom("a")])}),
-    ]),
-    ([
-        # ?- nat(X).
-        Struct("nat", Var("X")),
-    ], [
-        Solution({Var("X"): Atom("0")}),
-        Solution({Var("X"): Struct("s", Atom("0"))}),
-        Solution({Var("X"): Struct("s", Struct("s", Atom("0")))}),
-        Solution({Var("X"): Struct("s", Struct("s", Struct("s", Atom("0"))))}),
-    ]),
-    ([
-        # ?- member(f(X), [a, f(b), g(c), f(d)]).
-        Struct("member", Struct("f", Var("X")), to_list([
-            Atom("a"),
-            Struct("f", Atom("b")),
-            Struct("g", Atom("c")),
-            Struct("f", Atom("d")),
-        ])),
-    ], [
-        Solution({Var("X"): Atom("b")}),
-        Solution({Var("X"): Atom("d")}),
-    ]),
+    (
+        'length(L, s(s(s(0)))), member(a, L)',
+        [
+            Struct("length", Var("L"), Struct("s", Struct("s", Struct("s", Atom("0"))))),
+            Struct("member", Atom("a"), Var("L")),
+        ], [
+            Solution({Var("L"): to_list([Atom("a"), Var("_"), Var("_")])}),
+            Solution({Var("L"): to_list([Var("_"), Atom("a"), Var("_")])}),
+            Solution({Var("L"): to_list([Var("_"), Var("_"), Atom("a")])}),
+        ]),
+    (
+        'nat(X)',
+        [
+            Struct("nat", Var("X")),
+        ], [
+            Solution({Var("X"): Atom("0")}),
+            Solution({Var("X"): Struct("s", Atom("0"))}),
+            Solution({Var("X"): Struct("s", Struct("s", Atom("0")))}),
+            Solution({Var("X"): Struct("s", Struct("s", Struct("s", Atom("0"))))}),
+        ]),
+    (
+        'member(f(X), [a, f(b), g(c), f(d)])',
+        [
+            Struct("member", Struct("f", Var("X")), to_list([
+                Atom("a"),
+                Struct("f", Atom("b")),
+                Struct("g", Atom("c")),
+                Struct("f", Atom("d")),
+            ])),
+        ], [
+            Solution({Var("X"): Atom("b")}),
+            Solution({Var("X"): Atom("d")}),
+        ]),
 ]
 
 
@@ -73,9 +76,10 @@ def ignore_vars_in_solution(solution: Solution) -> Solution:
     return Solution({x: ignore_vars(term) for x, term in solution.items()})
 
 
-@pytest.mark.parametrize("query, solutions", testdata)
-def test_interpreter(query, solutions):
+@pytest.mark.parametrize("testname, query, solutions", testdata)
+def test_interpreter(testname, query, solutions):
     wam = Machine(package, query)
+    wam.debug_filename = f'debugtest/{testname}.jsonl'
     for got, want in zip(wam.run(), solutions):
         got = ignore_vars_in_solution(got)
         assert got == want

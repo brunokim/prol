@@ -1,6 +1,7 @@
 from dataclasses import dataclass, fields
 from typing import List, ClassVar, Any, Tuple
 import re
+from json_debug import to_json, StrJsonMixin
 
 __all__ = [
     'Term', 'Var', 'Atom', 'Struct', 'Functor', 'Clause',
@@ -79,7 +80,7 @@ class Atom(Term):
 
 
 @dataclass(frozen=True)
-class Functor:
+class Functor(StrJsonMixin):
     name: str
     arity: int
 
@@ -156,7 +157,7 @@ class Clause:
         return str(self)
 
 
-class Addr:
+class Addr(StrJsonMixin):
     pass
 
 
@@ -191,6 +192,13 @@ class Instruction:
     def __str__(self):
         args = ", ".join(str(getattr(self, field.name)) for field in fields(self))
         return f"{self.name} {args}"
+
+    def to_json(self):
+        obj = {'Type': self.name}
+        for field in fields(self):
+            value = getattr(self, field.name)
+            obj[field.name] = to_json(value)
+        return obj
 
 
 @dataclass(frozen=True)

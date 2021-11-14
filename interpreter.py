@@ -5,9 +5,11 @@ from enum import Enum, auto
 from model import *
 from compiler import ClauseCompiler, PackageCompiler, Code, Index
 from functools import total_ordering
-from typing import Mapping, List, Optional, Iterator, Tuple, Dict
+from typing import Mapping, List, Optional, Iterator, Tuple, Dict, Any
 from enum import Enum, auto
 import operator
+import json
+from json_debug import to_json, index
 
 
 __all__ = [
@@ -180,6 +182,13 @@ class InstrAddr:
         code = self.codes[self.order]
         return code.instructions[self.instr]
 
+    def to_json(self, codes):
+        return {
+            'ClausePos': index(self.codes[self.order], codes),
+            'Pos': self.instr,
+            'Ref': f"pos {self.instr}",
+        }
+
 
 class StructArgMode(Enum):
     INVALID = auto()
@@ -192,6 +201,13 @@ class StructArg:
     mode: StructArgMode
     struct: Optional[StructCell] = None
     index: int = 0
+
+    def to_json(self):
+        return {
+            'Cell': to_json(self.struct),
+            'Mode': self.mode.name.lower(),
+            'Index': self.index,
+        }
 
 
 @dataclass
@@ -239,12 +255,32 @@ class Env:
             env = env.prev
         return reversed(envs)
 
+    def to_json(self, envs):
+        return {
+            'PrevPos': index(self.prev, envs),
+            'Continuation': to_json(self.continuation),
+            'PermanentVars': to_json(self.slots),
+        }
+
 
 @dataclass
 class Choice:
     state: MachineState
     trail: List[Ref] = field(default_factory=list)
     prev: Optional["Choice"] = None
+
+    def to_json(self, codes, choices, envs):
+        return {
+            'PrevPos': index(self.prev, choices),
+            'NextAlternative': to_json(self.state.instr_ptr.next_clause(), codes),
+            'Args': to_json(self.state.regs),
+            'Trail': to_json(self.trail),
+            'Attributes': [],
+            'LastRefID': self.state.top_ref_id,
+            'EnvPos': index(self.state.env, envs),
+            'CutChoicePos': None,
+            'Continuation': to_json(self.state.continuation, codes),
+        }
 
 
 @dataclass
@@ -287,6 +323,8 @@ class Machine:
         self.iter = 0
         self.max_iter = max_iter
         self.has_backtracked = False
+        self.debug_filename = None
+        self.debug_codes = None
 
         # Utility for debugging grammars, storing the deepest solution, which is likely to
         # represent the farthest in the string we got before failing.
@@ -314,8 +352,9 @@ class Machine:
 
     def run(self) -> Iterator[Solution]:
         try:
+            self.debug_init()
             while self.iter < self.max_iter:
-                # self.debug_state()
+                self.debug_state()
                 yield from self.run_instr(self.instr())
                 self.iter += 1
             raise MaxIterReached(self.max_iter)
@@ -326,13 +365,20 @@ class Machine:
             traceback.print_tb(e.__traceback__)
             print(e)
 
+    def debug_init(self):
+        if not self.debug_filename:
+            return
+        self.debug_codes = list(indices_codes(self.indices_by_functor))
+        with open(self.debug_filename, 'w') as f:
+            json.dump(self.to_json(include_clauses=True), f)
+            f.write('\n')
+
     def debug_state(self):
-        mark = '*' if self.has_backtracked else ' '
-        num_envs = len(Env.stack(self.state.env))
-        instr = str(self.instr())
-        regs = ' '.join(f'{reg!s:<10}' for reg in self.state.regs)
-        slots = ' '.join(f'{slot!s:<10}' for slot in self.state.env.slots) if self.state.env else ''
-        print(f"{mark} {self.state.depth:04d} {'  '*num_envs}{instr:<{40-num_envs*2}} {regs} | {slots}")
+        if not self.debug_filename:
+            return
+        with open(self.debug_filename, 'a') as f:
+            json.dump(self.to_json(), f)
+            f.write('\n')
 
     def solution_for(self, state: MachineState) -> Optional[Solution]:
         if not state.env:
@@ -687,6 +733,54 @@ class Machine:
                     i += 1
         return s[:-1]  # Remove last newline
 
+    def to_json(self, include_clauses=False):
+        choices, envs = self.live_choices_and_envs()
+        clauses = to_json(self.debug_codes) if include_clauses else []
+        obj = {
+            'Mode': 'Run',
+            'Clauses': clauses,
+            'CodePtr': to_json(self.state.instr_ptr, self.debug_codes),
+            'Continuation': to_json(self.state.continuation, self.debug_codes),
+            'Reg': to_json(self.state.regs),
+            'ComplexArg': to_json(self.state.struct_arg),
+            'UnifFrames': [],
+            'EnvPos': index(self.state.env, envs),
+            'Envs': to_json(envs, envs),
+            'ChoicePos': index(self.choice, choices),
+            'ChoicePoints': to_json(choices, self.debug_codes, choices, envs),
+            'LastRefId': self.state.top_ref_id,
+            'Backtracked': self.has_backtracked,
+            'Attributes': [],
+        }
+        return obj
+
+    def live_choices_and_envs(self):
+        # Collect live choice points
+        choice = self.choice
+        choices = []
+        while choice is not None:
+            choices.append(choice)
+            choice = choice.prev
+
+        # Collect live environments
+        env_leafs = [self.state.env] + [choice.state.env for choice in choices]
+        env_leafs = {id(env): env for env in env_leafs if env is not None}
+        envs = []
+        for id_env, leaf_env in env_leafs.items():
+            envs.append(leaf_env)
+            env = leaf_env.prev
+            while env is not None and id(env) not in env_leafs:
+                envs.append(env)
+                env = env.prev
+
+        return choices, envs
+
+
+def indices_codes(indices_by_functor):
+    for indices in indices_by_functor.values():
+        for index in indices:
+            yield from index.by_var
+
 
 class NoMoreChoices(Exception):
     pass
@@ -735,6 +829,7 @@ def main():
 
     wam = Machine(package, query)
     print(wam)
+    wam.debug_filename = 'debugtest/interpreter.jsonl'
     for solution in wam.run():
         print(solution)
 

@@ -1,0 +1,108 @@
+.active {
+    background-color: #ff6;
+}
+
+.backtrack {
+    background-color: #f66;
+}
+
+.instructions, .switch-table {
+    font-family: monospace;
+    border-collapse: collapse;
+}
+
+.instructions td, .switch-table td {
+    padding-right: 1em;
+}
+
+.machine-state {
+    display: flex;
+    align-items: flex-start;
+    gap: 5em;
+}
+
+.globals {
+    border-collapse: collapse;
+}
+
+.globals thead {
+    font-size: 12pt;
+    font-family: sans-serif;
+}
+
+.globals td:first-child {
+    font-size: 10pt;
+    font-family: sans-serif;
+    font-weight: bold;
+}
+
+.globals td:nth-child(2) {
+    font-family: monospace;
+}
+
+.attributes thead {
+    font-size: 11pt;
+    font-family: sans-serif;
+}
+
+.attributes thead tr:first-child{
+    font-size: 12pt;
+}
+
+.attributes tbody {
+    font-family: monospace;
+}
+
+.attributes tbody td:first-child {
+    font-weight: bold;
+}
+
+.instructions ol {
+    list-style: none;
+    display: inline;
+}
+
+.instructions li {
+    display: inline;
+}
+
+.instructions li + li:before {
+    content: ", ";
+}
+
+.registers thead {
+    font-size: 12pt;
+    font-family: sans-serif;
+}
+
+.registers tbody, .trail tbody {
+    font-family: monospace;
+}
+
+.registers td:first-child, .trail td:first-child {
+    font-weight: bold;
+}
+
+.container {
+    display:flex;
+    align-items: first baseline;
+    gap: 1em;
+}
+
+.hidden {
+    display: none;
+}
+
+.env-header, .choice-header {
+    cursor: pointer;
+    color: white;
+    font-family: monospace;
+}
+
+.env-header {
+    background-color: rebeccapurple;
+}
+
+.choice-header {
+    background-color: black;
+}

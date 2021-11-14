@@ -125,10 +125,12 @@ def decode_clauses(encoded: Term) -> List[Clause]:
     return [decode_clause(term) for term in terms]
 
 
-def parse_ast(text: str, grammar: str):
+def parse_ast(text: str, grammar: str, *, store_deepest_state=False, debug_filename=None):
     try:
         chars = str_to_chars(text)
         m = Machine(facts + rules, [s(grammar, chars, "Tree")])
+        m.store_deepest_state = store_deepest_state
+        m.debug_filename = debug_filename
         solution = next(m.run())
         return solution[Var("Tree")]
     except StopIteration:
@@ -149,17 +151,17 @@ def parse_ast(text: str, grammar: str):
             f"""parse error:\n  closest solution: {m.deepest_solution}\n  call stack:\n    {call_stack}""")
 
 
-def parse_term(text: str) -> Term:
-    return decode_term(parse_ast(text, "parse_term"))
+def parse_term(text: str, **kwargs) -> Term:
+    return decode_term(parse_ast(text, "parse_term", **kwargs))
 
 
-def parse_query(text: str) -> List[Struct]:
-    terms = decode_terms(parse_ast(text, "parse_query"))
+def parse_query(text: str, **kwargs) -> List[Struct]:
+    terms = decode_terms(parse_ast(text, "parse_query", **kwargs))
     return [query_term(term) for term in terms]
 
 
-def parse_kb(text: str) -> List[Clause]:
-    return decode_clauses(parse_ast(text, "parse_kb"))
+def parse_kb(text: str, **kwargs) -> List[Clause]:
+    return decode_clauses(parse_ast(text, "parse_kb", **kwargs))
 
 
 # Set of facts about letters

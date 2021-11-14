@@ -18,6 +18,7 @@ from typing import cast, Sequence, Dict, Iterator, Tuple, Set, List, Union, Muta
 from operator import attrgetter
 from dataclasses import dataclass, field
 import itertools as it
+from json_debug import to_json
 
 
 @dataclass
@@ -77,6 +78,13 @@ class Code:
             last_instr = self.instructions.pop()
             self.instructions.append(Deallocate())
             self.instructions.append(last_instr)
+
+    def to_json(self):
+        return {
+            "Functor": to_json(self.functor),
+            "NumRegisters": self.num_regs,
+            "Code": to_json(self.instructions),
+        }
 
 
 @dataclass
