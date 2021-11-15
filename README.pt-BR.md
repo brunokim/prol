@@ -15,7 +15,8 @@ da máquina.
 ## Visualizador de debug
 
 Após criar um objeto `Machine()`, você pode setar o atributo `debug_filename` com o nome
-de um arquivo onde ele vai escrever o estado interno da máquina como um JSON para cada iteração.
+de um arquivo onde ele [escreve o estado interno da máquina](https://twitter.com/thingskatedid/status/1386077306381242371)
+como um JSON para cada iteração.
 Você pode visualizar a execução da máquina rodando um servidor HTTP dentro da pasta debug/,
 por exemplo, com `python -m http.server`, e carregando o arquivo JSONL.
 Como uma amostra, `debugtest/interpreter.jsonl` contém a execução de `interpreter.py`.

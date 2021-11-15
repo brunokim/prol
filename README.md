@@ -14,7 +14,8 @@ the main instructions, compiling, register allocation and machine functions.
 ## Debug viewer
 
 After creating a `Machine()` object, you may set its `debug_filename` attribute with the
-name of a file where it will write the machine's internal state as a JSON for each iteration.
+name of a file where it [writes the machine's internal state](https://twitter.com/thingskatedid/status/1386077306381242371)
+as a JSON for each iteration.
 You may visualize the execution by running an HTTP server within the debug/ folder, e.g.
 with `python -m http.server`, and loading the JSONL file.
 As a sample, `debugtest/interpreter.jsonl` contains the execution for `interpreter.py`.
