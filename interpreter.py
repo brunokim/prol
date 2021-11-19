@@ -41,9 +41,6 @@ class Cell:
     def order(cls) -> int:
         raise NotImplementedError("{cls}.order")
 
-    def to_term(self) -> Term:
-        raise NotImplementedError("{type(self)}.to_term")
-
     def compare(self, other) -> Ordering:
         raise NotImplementedError("{type(self)}.compare")
 
@@ -54,17 +51,8 @@ class Cell:
             return False
         return self.compare(other) == Ordering.LT
 
-    def __str__(self):
-        return f"@{self.to_term()}"
-
-    def __repr__(self):
-        return str(self)
-
-
-def to_term(cell: Optional[Cell]) -> Term:
-    if cell is None:
-        return Atom("")
-    return cell.to_term()
+    def to_json(self):
+        return str(to_term(self))
 
 
 @dataclass
@@ -81,11 +69,6 @@ class Ref(Cell):
             return self
         return self.value
 
-    def to_term(self) -> Term:
-        if self.value is None:
-            return Var(f"_{self.id_}")
-        return self.value.to_term()
-
     def compare(self, other: "Ref") -> Ordering:
         return Ordering.compare(self.id_, other.id_)
 
@@ -97,9 +80,6 @@ class AtomCell(Cell):
     @classmethod
     def order(cls):
         return 20
-
-    def to_term(self) -> Term:
-        return self.value
 
     def compare(self, other: "AtomCell") -> Ordering:
         return Ordering.compare(self.value.name, other.value.name)
@@ -125,10 +105,6 @@ class StructCell(Cell):
     def from_functor(cls, f: Functor) -> "StructCell":
         return StructCell(f.name, [None for _ in range(f.arity)])
 
-    def to_term(self) -> Term:
-        args = [to_term(arg) for arg in self.args]
-        return Struct(self.name, *args)
-
     def compare(self, other: "StructCell") -> Ordering:
         pairs = [(self.arity, other.arity), (self.name, other.name)]
         pairs += zip(self.args, other.args)
@@ -139,6 +115,39 @@ class StructCell(Cell):
             if order != Ordering.EQ:
                 return order
         return Ordering.EQ
+
+
+def to_term(cell: Optional[Cell]) -> Term:
+    """Iterative conversion of cells to terms"""
+    stack = [cell]
+    terms = []
+
+    def gen_terms(elem):
+        if elem is None:
+            yield Atom("")
+        elif isinstance(elem, AtomCell):
+            yield elem.value
+        elif isinstance(elem, Ref):
+            if elem.value is None:
+                yield Var(f"_{elem.id_}")
+            else:
+                stack.append(elem.value)
+        elif isinstance(elem, StructCell):
+            # Place args reversed so that they are popped in order. The last element to be popped
+            # is the functor, which builds a struct from the top elements of terms stack.
+            stack.append(elem.functor())
+            stack.extend(reversed(elem.args))
+        elif isinstance(elem, Functor):
+            args = terms[-elem.arity:]
+            del terms[-elem.arity:]
+            yield Struct(elem.name, *args)
+        else:
+            raise ValueError(f"unhandled cell type {type(cell)} ({cell})")
+    while stack:
+        elem = stack.pop()
+        terms.extend(gen_terms(elem))
+    assert len(terms) == 1, f"expected 1 term when converting cell {cell!r}, got {len(terms)}: {terms}"
+    return terms[0]
 
 
 def indexed_codes(indices: List[Index], first_arg: Optional[Cell]) -> List[Code]:

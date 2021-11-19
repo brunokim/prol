@@ -104,8 +104,7 @@ class Struct(Term):
         return Functor(self.name, self.arity)
 
     def __str__(self):
-        args = ", ".join(str(arg) for arg in self.args)
-        return f"{self.name}({args})"
+        return str_term(self)
 
     def __hash__(self):
         return self._hash
@@ -118,6 +117,25 @@ class Struct(Term):
             return f"Struct({self.name!r})"
         args = ", ".join(repr(arg) for arg in self.args)
         return f"Struct({self.name!r}, {args})"
+
+
+def str_term(term: Term):
+    stack: List[Union[Term, str]] = [term]
+    s = ""
+    while stack:
+        elem = stack.pop()
+        if isinstance(elem, (Atom, Var, str)):
+            s += str(elem)
+        elif isinstance(elem, Struct):
+            s += f"{elem.name}("
+            stack.append(")")
+            for i, arg in enumerate(elem.args[::-1]):
+                if i > 0:
+                    stack.append(", ")
+                stack.append(arg)
+        else:
+            raise ValueError(f"unhandled Term type {type(elem)} ({elem!r})")
+    return s
 
 
 def to_list(terms: List[Term], tail: Term = Atom("[]")) -> Term:
