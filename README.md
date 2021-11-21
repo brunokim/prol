@@ -18,9 +18,12 @@ name of a file where it [writes the machine's internal state](https://twitter.co
 as a JSON for each iteration.
 You may visualize the execution by running an HTTP server within the debug/ folder, e.g.
 with `python -m http.server`, and loading the JSONL file.
-As a sample, `debugtest/interpreter.jsonl` contains the execution for `interpreter.py`.
 
 ![Screenshot of debug view, showcasing instructions, register values and controls](docs/debug-view.png)
+
+As a sample, `debugtest/interpreter.jsonl` contains the execution for `interpreter.py`.
+If you wish to dump execution for some grammar tests, run `pytest --debug_grammar`.
+Warning: debug dumping is slooow.
 
 ## Documentation
 

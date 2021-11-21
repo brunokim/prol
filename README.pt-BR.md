@@ -19,9 +19,12 @@ de um arquivo onde ele [escreve o estado interno da máquina](https://twitter.co
 como um JSON para cada iteração.
 Você pode visualizar a execução da máquina rodando um servidor HTTP dentro da pasta debug/,
 por exemplo, com `python -m http.server`, e carregando o arquivo JSONL.
-Como uma amostra, `debugtest/interpreter.jsonl` contém a execução de `interpreter.py`.
 
 ![Screenshot do visualizador de debug, mostrando as instruções, valores de registros e controles](docs/debug-view.png)
+
+Como uma amostra, `debugtest/interpreter.jsonl` contém a execução de `interpreter.py`.
+Se você desejar escrever a execução de alguns testes de `grammar`, rode `pytest --debug_grammar`.
+Aviso: a escrita de debug é leeenta.
 
 ## Documentação
 

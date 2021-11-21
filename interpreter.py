@@ -264,10 +264,10 @@ class Env:
             env = env.prev
         return reversed(envs)
 
-    def to_json(self, envs):
+    def to_json(self, codes, envs):
         return {
             'PrevPos': index(self.prev, envs),
-            'Continuation': to_json(self.continuation),
+            'Continuation': to_json(self.continuation, codes),
             'PermanentVars': to_json(self.slots),
         }
 
@@ -754,7 +754,7 @@ class Machine:
             'ComplexArg': to_json(self.state.struct_arg),
             'UnifFrames': [],
             'EnvPos': index(self.state.env, envs),
-            'Envs': to_json(envs, envs),
+            'Envs': to_json(envs, self.debug_codes, envs),
             'ChoicePos': index(self.choice, choices),
             'ChoicePoints': to_json(choices, self.debug_codes, choices, envs),
             'LastRefId': self.state.top_ref_id,

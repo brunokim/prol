@@ -46,21 +46,21 @@ def test_parse_query(text, query):
     assert parse_query(text) == query
 
 
-@pytest.mark.parametrize('text, clauses', [
-    ("f().", [Clause(Struct("f"))]),
-    ("f(). g().", [Clause(Struct("f")), Clause(Struct("g"))]),
-    ("f(a).", [Clause(Struct("f", Atom("a")))]),
-    ("f(a, b).", [Clause(Struct("f", Atom("a"), Atom("b")))]),
-    ("f() :- a.", [Clause(Struct("f"), Struct("a"))]),
-    ("f(X) :- g(X).", [Clause(Struct("f", Var("X")), Struct("g", Var("X")))]),
-    ("""f(X) :- g(X).
+@pytest.mark.parametrize('desc, text, clauses', [
+    ('nilary-fact', "f().", [Clause(Struct("f"))]),
+    ('nilary-facts', "f(). g().", [Clause(Struct("f")), Clause(Struct("g"))]),
+    ('unary-fact', "f(a).", [Clause(Struct("f", Atom("a")))]),
+    ('binary-fact', "f(a, b).", [Clause(Struct("f", Atom("a"), Atom("b")))]),
+    (None, "f() :- a.", [Clause(Struct("f"), Struct("a"))]),
+    (None, "f(X) :- g(X).", [Clause(Struct("f", Var("X")), Struct("g", Var("X")))]),
+    (None, """f(X) :- g(X).
         g(a).
     """, [
         Clause(Struct("f", Var("X")), Struct("g", Var("X"))),
         Clause(Struct("g", Atom("a"))),
     ]),
-    ("p() :- a, X, q().", [Clause(Struct("p"), Struct("a"), Struct("call", Var("X")), Struct("q"))]),
-    ("""
+    (None, "p() :- a, X, q().", [Clause(Struct("p"), Struct("a"), Struct("call", Var("X")), Struct("q"))]),
+    (None, """
         parse_term(Chars, Term) :- parse_term(Term, Chars, []).
         parse_term(Chars, T0, T3) :-
             ws(T0, T1),
@@ -75,5 +75,8 @@ def test_parse_query(text, query):
                Struct("ws", Var("T2"), Var("T3"))),
     ]),
 ])
-def test_parse_kb(text, clauses):
-    assert parse_kb(text) == clauses
+def test_parse_kb(desc, text, clauses, debug_grammar):
+    debug_filename = None
+    if debug_grammar and desc is not None:
+        debug_filename = f'debugtest/{desc}.jsonl'
+    assert parse_kb(text, debug_filename=debug_filename) == clauses
