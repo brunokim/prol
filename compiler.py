@@ -554,13 +554,13 @@ class ChunkCompiler:
             # Conflict avoidance: do not use registers that are necessary for last goal args.
             no_use = no_use | self.conflict[x]
 
-        addr = self.alloc_reg(x, use, no_use)
+        addr = self.alloc_reg(use, no_use)
         self.set_reg(addr, x)
 
         alloc = AddrAlloc.NEW_VAR if isinstance(x, Var) else AddrAlloc.NEW_STRUCT
         return addr, alloc
 
-    def alloc_reg(self, x: Union[Var, Struct], use: Set[Register], no_use: Set[Register]) -> Register:
+    def alloc_reg(self, use: Set[Register], no_use: Set[Register]) -> Register:
         """Allocate a register for a variable or struct."""
         # Try to allocate a free register.
         free = self.free_regs & use
