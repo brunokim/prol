@@ -47,7 +47,8 @@ We may query for all combinations of bits and colors by querying for both `bit(X
   X = 0, Y = green ;
   X = 0, Y = blue ;
   X = 1, Y = red ;
-  X = 1, Y = green .
+  X = 1, Y = green ;
+  X = 1, Y = blue .
 ```
 
 Note that `bit(X), color(X)` can't be satisfied, because there's no `color(0)` or `bit(red)` that would satisfy both facts simultaneously:
