@@ -4,6 +4,16 @@ Esta é uma implementação simplificada da Máquina Abstrata de Warren (WAM) pa
 que demonstra as principais instruções, compilação, alocação de registros e funções
 da máquina.
 
+## Documentação
+
+1. [Sobre Prolog](docs.pt-BR/about-prolog.md): uma introdução apressada se você não sabe do que isso se trata.
+1. [Estratégia de resolução](docs.pt-BR/resolution.md): como uma consulta é realmente resolvida em Prolog.
+1. [Warren Abstract Machine](docs.pt-BR/wam.md): tentativa de explicar a implementação.
+1. [Indexando](docs.pt-BR/indices.md): implementação de indexação para acelerar alguns padrões de chamada.
+1. [Parsing](docs.pt-BR/parsing.md): explicação das estruturas básicas de parsing.
+1. [Gramática](docs.pt-BR/grammar.md): documentação para a aplicação de exemplo de parsing de gramática.
+1. [Coisas extras](docs.pt-BR/references.md): o que esta implementação simplificou da WAM, e referências.
+
 ## Organização do código
 
 - model.py: Objetos de dados, representando termos, programas e entidades da máquina.
@@ -25,14 +35,3 @@ por exemplo, com `python -m http.server`, e carregando o arquivo JSONL.
 Como uma amostra, `debugtest/interpreter.jsonl` contém a execução de `interpreter.py`.
 Se você desejar escrever a execução de alguns testes de `grammar`, rode `pytest --debug_grammar`.
 Aviso: a escrita de debug é leeenta.
-
-## Documentação
-
-1. [Sobre Prolog](docs.pt-BR/about-prolog.md): uma introdução apressada se você não sabe do que isso se trata.
-1. [Estratégia de resolução](docs.pt-BR/resolution.md): como uma consulta é realmente resolvida em Prolog.
-1. [Warren Abstract Machine](docs.pt-BR/wam.md): tentativa de explicar a implementação.
-1. [Indexando](docs.pt-BR/indices.md): implementação de indexação para acelerar alguns padrões de chamada.
-1. [Parsing](docs.pt-BR/parsing.md): explicação das estruturas básicas de parsing.
-1. [Gramática](docs.pt-BR/grammar.md): documentação para a aplicação de exemplo de parsing de gramática.
-1. [Coisas extras](docs.pt-BR/references.md): o que esta implementação simplificou da WAM, e referências.
-
