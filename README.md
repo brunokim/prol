@@ -3,6 +3,18 @@
 This is a simplified Warren Abstract Machine (WAM) implementation for Prolog, that showcases
 the main instructions, compiling, register allocation and machine functions.
 
+## Documentation
+
+🇧🇷 🇵🇹 Veja a [documentação em Português](https://github.com/brunokim/prol/blob/main/README.pt-BR.md)! 🇦🇴 🇲🇿
+
+1. [About Prolog](docs/about-prolog.md): a hurried primer if you don't know what it is about.
+1. [Resolution strategy](docs/resolution.md): how a query is actually solved in Prolog. 
+1. [Warren Abstract Machine](docs/wam.md): details about the implementation attempted here.
+1. [Indexing](docs/indices.md): indexing implementation to fast-track some call patterns.
+1. [Parsing](docs/parsing.md): explaining basic structures for parsing
+1. [Grammar](docs/grammar.md): documentation for the sample application of grammar parsing.
+1. [Stuff left out](docs/references.md): what this implementation has simplified from the WAM, and references.
+
 ## Code organization
 
 - model.py: Data objects representing terms, programs, and machine entities.
@@ -24,14 +36,3 @@ with `python -m http.server`, and loading the JSONL file.
 As a sample, `debugtest/interpreter.jsonl` contains the execution for `interpreter.py`.
 If you wish to dump execution for some grammar tests, run `pytest --debug_grammar`.
 Warning: debug dumping is slooow.
-
-## Documentation
-
-1. [About Prolog](docs/about-prolog.md): a hurried primer if you don't know what it is about.
-1. [Resolution strategy](docs/resolution.md): how a query is actually solved in Prolog. 
-1. [Warren Abstract Machine](docs/wam.md): details about the implementation attempted here.
-1. [Indexing](docs/indices.md): indexing implementation to fast-track some call patterns.
-1. [Parsing](docs/parsing.md): explaining basic structures for parsing
-1. [Grammar](docs/grammar.md): documentation for the sample application of grammar parsing.
-1. [Stuff left out](docs/references.md): what this implementation has simplified from the WAM, and references.
-
